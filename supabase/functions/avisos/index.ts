@@ -203,8 +203,30 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ avisos: avisos?.length ?? 0, dispositivos: 0 }), { status: 200 });
   }
 
-  let ok = 0, fallos = 0;
+  let ok = 0, fallos = 0, repetidos = 0;
   for (const aviso of (avisos ?? [])) {
+    /* RESERVAR EL AVISO ANTES DE MANDARLO
+     * ----------------------------------
+     * Antes se marcaba enviado DESPUES de mandarlo, y en ese hueco cabia otra
+     * pasada: el cron corre cada minuto, asi que si una tanda tarda mas de lo
+     * normal la siguiente lee los mismos avisos pendientes y los vuelve a
+     * mandar. Jose recibio cada aviso por duplicado.
+     *
+     * Ahora se marca PRIMERO, con la condicion de que siga sin marcar. El
+     * filtro enviado_at=is.null viaja en la propia peticion, asi que la carrera
+     * la resuelve la base: solo una pasada se lo lleva, y las demas reciben
+     * cero filas y siguen de largo. */
+    const reserva = await api(
+      'avisos?id=eq.' + aviso.id + '&enviado_at=is.null',
+      {
+        method: 'PATCH',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({ enviado_at: new Date().toISOString() }),
+      },
+    );
+    const reservadas = await reserva.json().catch(() => []);
+    if (!Array.isArray(reservadas) || reservadas.length === 0) { repetidos++; continue; }
+
     let alguno = false;
     for (const d of disps) {
       try {
@@ -232,15 +254,19 @@ Deno.serve(async (req) => {
     /* Se marca enviado si llegó AL MENOS a un teléfono. Si no llegó a ninguno
        se deja pendiente y el siguiente ciclo lo reintenta: es preferible un
        aviso repetido a uno perdido. */
+    /* Si no llego a NINGUN telefono se devuelve a la cola, porque la reserva
+       de arriba ya lo dio por enviado. Un aviso repetido molesta; uno perdido
+       puede ser un huesped sin agua caliente al que nadie atiende. */
     if (alguno) {
       ok++;
-      await api(`avisos?id=eq.${aviso.id}`, {
-        method: 'PATCH', body: JSON.stringify({ enviado_at: new Date().toISOString() }),
+    } else {
+      await api('avisos?id=eq.' + aviso.id, {
+        method: 'PATCH', body: JSON.stringify({ enviado_at: null }),
       });
     }
   }
 
-  return new Response(JSON.stringify({ enviados: ok, fallos, dispositivos: disps.length }), {
+  return new Response(JSON.stringify({ enviados: ok, fallos, repetidos, dispositivos: disps.length }), {
     status: 200, headers: { 'Content-Type': 'application/json' },
   });
 });
