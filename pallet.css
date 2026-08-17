@@ -1,0 +1,325 @@
+/* ============================================================
+   pl- : pallet de sacos de pellet en CSS 3D
+   Consume los tokens del panel (--hoja, --tinta, --timbre…):
+   un cambio de paleta no toca este archivo.
+   Todo se mide en em ligados al font-size de .pl-vista, que sale
+   del ancho del contenedor: una sola perilla de escala.
+   ============================================================ */
+
+.pl-pallet{
+  /* container query: el tamaño interno se liga al ancho real del
+     contenedor (cqw), no al viewport; la misma card funciona en
+     280px y en 560px sin media queries */
+  container-type: inline-size;
+  width: 100%;
+  --pl-escala: 1; /* única perilla si hay que afinar el tamaño a mano */
+  /* alto de la pila en Z; lo pone el JS según los sacos que quedan.
+     El fallback es el de un pallet lleno de 70 */
+  --pl-pila: 7.7em;
+}
+.pl-pallet *, .pl-pallet *::before, .pl-pallet *::after{ box-sizing: border-box; }
+
+.pl-vista{
+  font-size: calc(var(--pl-escala) * clamp(11px, 6.4cqw, 36px));
+  position: relative;
+  /* la caja mide lo que mide la pila: el pallet vacío ocupa lo que ocupa un
+     pallet vacío. Con altura fija quedaba un hueco en blanco arriba,
+     exactamente del tamaño del pellet ya gastado */
+  /* 8.8em = el pallet vacío ya proyectado (huella tumbada + faldón + borde
+     de la sombra), medido en el navegador. El .87 es cuánto crece en
+     pantalla cada em de pila: no es el coseno del rotateX, la perspectiva
+     lo amplifica */
+  height: calc(8.8em + .87 * var(--pl-pila));
+  /* perspectiva en em, no en px: la cámara escala con el objeto y el
+     escorzo se ve igual a cualquier ancho; 55em queda lejos, la
+     convergencia suave de una foto de producto, no ojo de pez */
+  perspective: 55em;
+  perspective-origin: 50% 30%;
+  animation: pl-aparecer .5s ease-out both;
+}
+
+.pl-escena{
+  /* huella del pallet (europeo, 10:7) y grosores */
+  --pl-ancho: 10em;
+  --pl-fondo: 7em;
+  --pl-camadas: 14;               /* lo sobrescribe el JS según capacidad */
+  /* el grosor de camada se recalcula para que el pallet LLENO mida
+     siempre lo mismo aunque cambie la capacidad; min() lo capa para
+     capacidades chicas */
+  --pl-alto-camada: min(.55em, calc(7.7em / var(--pl-camadas)));
+  --pl-tabla-grosor: .28em;
+  --pl-faldon: 1.06em;
+  /* contorno de tinta: sobre --papel un saco --hoja es casi invisible,
+     el borde hace TODO el trabajo de separación. max(1px, …) evita que
+     desaparezca por subpíxel en la card de 280px */
+  --pl-linea: max(1px, .04em) solid var(--tinta-3);
+  /* junta entre sacos. Con --raya-fuerte sobre --hoja-2 la diferencia era
+     de un pelo y trece camadas se leían como una pared lisa; la junta
+     tiene que ser una SOMBRA, que es lo que hay de verdad entre dos
+     bolsas. La primera línea es el fallback si no hay color-mix */
+  --pl-junta: var(--raya-fuerte);
+  --pl-junta: color-mix(in srgb, var(--tinta-3) 42%, transparent);
+
+  position: absolute;
+  left: calc(50% - var(--pl-ancho) / 2);
+  /* la base baja a medida que la pila mengua: el aire de arriba es solo el
+     que necesitan los sacos que quedan. El .84 es lo que sube en pantalla
+     cada em de pila, medido; deja ~0.3em de margen sobre el saco más alto */
+  top: calc(-.2em + .84 * var(--pl-pila));
+  width: var(--pl-ancho);
+  height: var(--pl-fondo);
+  /* rotateZ gira primero el plano del suelo, rotateX lo tumba después:
+     quedan visibles cara superior, frente y lateral izquierdo — la
+     vista en tres cuartos. Solo se construyen esas tres caras por
+     pieza; las ocultas no existen (presupuesto de nodos) */
+  transform: rotateX(58deg) rotateZ(-32deg);
+  transform-style: preserve-3d;
+  /* OJO con el apilado: dentro de preserve-3d el z-index y el orden del
+     DOM dejan de decidir qué tapa a qué; el navegador ordena por
+     profundidad real. Por eso no hay ni un z-index en el componente, y
+     por eso ningún ancestro intermedio puede llevar overflow:hidden ni
+     filter: aplanarían la escena */
+}
+
+/* sombra de contacto: gradiente radial en el plano del suelo. Nada de
+   filter:blur — caro en móvil y con sorpresas dentro de preserve-3d en
+   Safari; el desvanecido lo hace el propio gradiente. Va un pelo por
+   debajo del faldón para no coplanar con él (z-fighting) */
+.pl-sombra{
+  position: absolute;
+  inset: -6% -8%;
+  transform: translateZ(-1.38em);
+  background: radial-gradient(closest-side, var(--raya-fuerte), var(--raya) 45%, transparent 95%);
+}
+
+/* ---------- base: pallet gris, se lee por forma y corte de sombra ---------- */
+.pl-base{ position:absolute; inset:0; transform-style:preserve-3d; }
+
+/* 5 tablas superiores separadas; --t lo pone el JS.
+   Patrón de caras que se repite en todo el componente: el pseudo se
+   apoya en un borde, transform-origin en ese borde, y rotateX(-90)
+   (frente) o rotateY(90) (lateral) lo cuelga hacia abajo en Z.
+   Cada pieza son 1 div + 2 caras gratis */
+.pl-tabla{
+  position:absolute; left:0; right:0;
+  top: calc(var(--t) * 1.4875em); /* 5 tablas de 1.05em + 4 ranuras = 7em justos */
+  height: 1.05em;
+  transform-style: preserve-3d;
+  background: var(--raya-fuerte);
+  border: var(--pl-linea);
+}
+.pl-tabla::before, .pl-tabla::after{ content:""; position:absolute; }
+.pl-tabla::before{ /* canto que asoma por las ranuras */
+  left:0; right:0; top:100%; height:var(--pl-tabla-grosor);
+  transform-origin:50% 0; transform:rotateX(-90deg);
+  background: var(--tinta-3);
+}
+.pl-tabla::after{ /* testa izquierda, un valor más oscura: lado en sombra */
+  top:0; bottom:0; left:0; width:var(--pl-tabla-grosor);
+  transform-origin:0 50%; transform:rotateY(90deg);
+  background: var(--tinta-2);
+}
+
+/* faldones: tacos + patín son dos caras verticales pintadas con
+   gradientes de tramos duros, no nueve tacos de verdad. El translateZ
+   previo al rotate las cuelga bajo las tablas */
+.pl-faldon{ position:absolute; }
+.pl-faldon--frente{
+  left:0; right:0; top:100%; height:var(--pl-faldon);
+  transform-origin:50% 0;
+  transform: translateZ(calc(-1 * var(--pl-tabla-grosor))) rotateX(-90deg);
+  background:
+    linear-gradient(0deg, var(--tinta-3) 0 24%, transparent 24%),   /* patín corrido */
+    linear-gradient(90deg,
+      var(--tinta-3) 0 16%, var(--tinta) 16% 42%,
+      var(--tinta-3) 42% 58%, var(--tinta) 58% 84%,
+      var(--tinta-3) 84% 100%);                                     /* 3 tacos, hueco en --tinta */
+}
+.pl-faldon--lado{
+  top:0; bottom:0; left:0; width:var(--pl-faldon);
+  transform-origin:0 50%;
+  transform: translateZ(calc(-1 * var(--pl-tabla-grosor))) rotateY(90deg);
+  /* tras rotateY el eje x local del pseudo apunta hacia abajo: por eso
+     aquí el patín va a 90deg y los tacos a 180deg */
+  background:
+    linear-gradient(90deg, transparent 0 76%, var(--tinta-2) 76%),
+    linear-gradient(180deg,
+      var(--tinta-2) 0 20%, var(--tinta) 20% 42%,
+      var(--tinta-2) 42% 58%, var(--tinta) 58% 80%,
+      var(--tinta-2) 80% 100%);
+}
+
+/* ---------- pila ---------- */
+.pl-pila{ position:absolute; inset:0; transform-style:preserve-3d; }
+
+/* reparto de nodos: solo la camada SUPERIOR enseña la tapa, así que esa
+   se dibuja siempre saco a saco (esquinas redondeadas de verdad) y las
+   de abajo son losas de 1 div + 2 caras que solo pintan sus costados.
+   Es lo que permite 14 camadas sin pasar de ~35 elementos */
+.pl-camada{
+  position:absolute;
+  inset:.12em; /* los sacos no llegan al canto de la tabla */
+  transform-style:preserve-3d;
+  /* la cara superior sube (i+1) grosores; los costados cuelgan un
+     grosor hasta apoyar en la camada anterior */
+  transform: translate3d(0,0, calc((var(--i) + 1) * var(--pl-alto-camada)));
+}
+/* desalineado alterno de medio dedo: sin esto la pila parece extruida
+   de una pieza */
+.pl-camada:nth-child(even){
+  transform: translate3d(.1em, -.07em, calc((var(--i) + 1) * var(--pl-alto-camada)));
+}
+
+.pl-camada::before, .pl-camada::after{ content:""; position:absolute; }
+.pl-camada::before{
+  left:0; right:0; top:100%; height:var(--pl-alto-camada);
+  transform-origin:50% 0; transform:rotateX(-90deg);
+}
+.pl-camada::after{
+  top:0; bottom:0; left:0; width:var(--pl-alto-camada);
+  transform-origin:0 50%; transform:rotateY(90deg);
+}
+/* la camada con sacos individuales es solo una bandeja transparente */
+.pl-camada--suelta{ background:none; }
+.pl-camada--suelta::before, .pl-camada--suelta::after{ content:none; }
+
+/* LOSA (camada llena tapada): borde en --raya-fuerte y no en tinta porque
+   visto casi de canto un borde oscuro se rompe en puntitos */
+.pl-camada--llena{
+  background: var(--hoja);
+  border: max(1px, .04em) solid var(--raya-fuerte);
+  border-radius: .3em;
+}
+
+/* La TAPA de la losa lleva dibujadas las juntas de su mosaico. Sin esto,
+   el hueco que deja un saco retirado enseñaba un plano blanco liso —una
+   pared— en vez de los sacos cruzados de la camada de abajo.
+   Cada banda se pinta como una capa con su propio tamaño: la del trío
+   ocupa el 60% y lleva dos juntas; la de la pareja, el 40% y una sola. */
+.pl-camada--x.pl-camada--llena{
+  background:
+    repeating-linear-gradient(90deg, var(--pl-junta) 0 1.5%, transparent 1.5% 33.34%)
+      no-repeat 0 0 / 100% 60%,      /* trío detrás */
+    repeating-linear-gradient(90deg, var(--pl-junta) 0 1.8%, transparent 1.8% 50%)
+      no-repeat 0 100% / 100% 40%,   /* pareja delante */
+    linear-gradient(var(--pl-junta), var(--pl-junta))
+      no-repeat 0 60% / 100% max(1px, .06em),  /* junta entre las dos bandas */
+    linear-gradient(var(--hoja), var(--hoja));
+}
+.pl-camada--y.pl-camada--llena{   /* el mismo mosaico girado */
+  background:
+    repeating-linear-gradient(90deg, var(--pl-junta) 0 1.8%, transparent 1.8% 50%)
+      no-repeat 0 0 / 100% 40%,
+    repeating-linear-gradient(90deg, var(--pl-junta) 0 1.5%, transparent 1.5% 33.34%)
+      no-repeat 0 100% / 100% 60%,
+    linear-gradient(var(--pl-junta), var(--pl-junta))
+      no-repeat 0 40% / 100% max(1px, .06em),
+    linear-gradient(var(--hoja), var(--hoja));
+}
+
+/* Mosaico trabado 2+3: pareja de sacos tumbados a lo ancho (media
+   plancha cada uno) + trío girado 90°. --x lleva la pareja delante;
+   --y es el patrón rotado 180°. Ningún saco cruza el pallet entero.
+   En las caras: valor medio (--hoja-2) al frente, sombra (--raya) al
+   lateral; las juntas entre sacos son transiciones suaves, no cortes
+   rectos: es lo que insinúa el redondeo del bulto */
+.pl-camada--x.pl-camada--llena::before{
+  /* costados de la pareja: 2 sacos, solo la junta entre ellos.
+     Aquí NO va la banda teal: repetida en trece camadas dejaba de ser un
+     acento y se convertía en un estampado. El teal vive únicamente en la
+     camada de arriba, la que se dibuja saco a saco */
+  background:
+    repeating-linear-gradient(90deg,
+      var(--pl-junta) 0 1.8%, transparent 1.8% 50%),
+    linear-gradient(var(--hoja-2), var(--hoja-2));
+  border: var(--pl-linea);
+  border-radius: 0 0 .22em .22em;
+}
+.pl-camada--y.pl-camada--llena::before{
+  /* tres culos de saco del trío, sin banda: la banda va en la cintura
+     y los extremos no la tienen. Este alternado con la camada de al
+     lado es lo que hace legible la traba a 90° mirando la pila */
+  background:
+    repeating-linear-gradient(90deg,
+      var(--pl-junta) 0 1.5%, transparent 1.5% 33.34%),
+    linear-gradient(var(--hoja-2), var(--hoja-2));
+  border: var(--pl-linea);
+  border-radius: 0 0 .22em .22em;
+}
+/* lateral: valor en sombra + una sola junta suave donde el mosaico
+   cambia de pareja a trío (60% en --x, 40% en --y) */
+.pl-camada--x.pl-camada--llena::after{
+  background:
+    linear-gradient(180deg, transparent 0 58.6%, var(--pl-junta) 58.6% 61.4%, transparent 61.4%),
+    linear-gradient(var(--raya), var(--raya));
+  border: var(--pl-linea);
+  border-radius: 0 .22em .22em 0; /* tras rotateY, esos son los cantos de abajo */
+}
+.pl-camada--y.pl-camada--llena::after{
+  background:
+    linear-gradient(180deg, transparent 0 38.6%, var(--pl-junta) 38.6% 41.4%, transparent 41.4%),
+    linear-gradient(var(--raya), var(--raya));
+  border: var(--pl-linea);
+  border-radius: 0 .22em .22em 0;
+}
+
+/* SACO individual (camada superior): blanco plano + contorno.
+   El volumen lo dan los tres valores y el borde, no degradados.
+   Esquinas generosas y ligeramente desiguales: la esquina viva es lo
+   primero que delata una caja; la asimetría evita el canto perfecto */
+.pl-saco{
+  position:absolute;
+  transform-style:preserve-3d;
+  /* posición del hueco del mosaico, la pone el JS en variables */
+  left: calc(var(--sx) * 1% + .06em);
+  top: calc(var(--sy) * 1% + .06em);
+  width: calc(var(--sw) * 1% - .12em);
+  height: calc(var(--sh) * 1% - .12em);
+  background: var(--hoja);
+  border: var(--pl-linea);
+  border-radius: .55em .68em .58em .72em;
+}
+.pl-saco:nth-child(even){ border-radius: .7em .55em .74em .6em; }
+/* banda de etiqueta cruzando la cintura: perpendicular al largo */
+.pl-saco--h{ /* tumbado a lo ancho del pallet */
+  background:
+    linear-gradient(90deg, transparent 45%, var(--timbre) 45% 55%, transparent 55%),
+    linear-gradient(var(--hoja), var(--hoja));
+}
+.pl-saco--v{ /* girado 90° */
+  background:
+    linear-gradient(180deg, transparent 45%, var(--timbre) 45% 55%, transparent 55%),
+    linear-gradient(var(--hoja), var(--hoja));
+}
+
+.pl-saco::before, .pl-saco::after{ content:""; position:absolute; }
+.pl-saco::before{ /* frente: en --h es el costado (banda), en --v el culo */
+  left:0; right:0; top:100%; height:var(--pl-alto-camada);
+  transform-origin:50% 0; transform:rotateX(-90deg);
+  border: var(--pl-linea);
+  border-radius: 0 0 .3em .3em;
+  background: var(--hoja-2);
+}
+.pl-saco--h::before{
+  background:
+    linear-gradient(90deg, transparent 45%, var(--timbre) 45% 55%, transparent 55%),
+    linear-gradient(var(--hoja-2), var(--hoja-2));
+}
+/* el lateral solo se paga en los sacos que tocan el borde izquierdo
+   (clase --borde desde el JS): las caras que nadie ve no existen */
+.pl-saco::after{ display:none; }
+.pl-saco--borde::after{
+  display:block;
+  top:0; bottom:0; left:0; width:var(--pl-alto-camada);
+  transform-origin:0 50%; transform:rotateY(90deg);
+  border: var(--pl-linea);
+  border-radius: 0 .25em .25em 0;
+  background: var(--raya);
+}
+
+/* entrada: opacidad y un translate corto sobre .pl-vista, fuera del
+   contexto 3D; se apaga si el sistema lo pide */
+@keyframes pl-aparecer{ from{ opacity:0; transform: translateY(.4em); } }
+@media (prefers-reduced-motion: reduce){
+  .pl-vista{ animation:none; }
+}

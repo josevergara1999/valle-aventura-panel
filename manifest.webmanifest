@@ -1,0 +1,17 @@
+{
+  "name": "Valle Aventura · Panel",
+  "short_name": "Valle Aventura",
+  "description": "Precios, disponibilidad y cotizaciones de las cabañas.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#E4EDE1",
+  "theme_color": "#E4EDE1",
+  "lang": "es-CL",
+  "icons": [
+    { "src": "icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

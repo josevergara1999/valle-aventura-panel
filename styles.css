@@ -1,0 +1,1150 @@
+/* Valle Aventura — panel. Mobile-first (~390px). Todo el color vive en tokens.css. */
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+html { background: var(--papel); }
+
+/* Los enlaces son casi siempre teléfonos: van en el teal de timbre, no en el
+   azul del navegador, que es de otro mundo. */
+a { color: var(--timbre); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--timbre) 35%, transparent); }
+
+body {
+  font-family: var(--fuente);
+  /* Dos halos muy suaves sobre el papel: dan la profundidad que en la web hace
+     la foto de fondo, sin cargar una imagen que en la montaña no bajaría. */
+  background:
+    radial-gradient(1100px 700px at 78% -10%, var(--papel-halo), transparent 62%),
+    radial-gradient(900px 600px at 8% 108%, var(--papel-halo), transparent 58%),
+    var(--papel);
+  background-attachment: fixed;
+  color: var(--tinta);
+  font-size: 15px;
+  line-height: 1.5;
+  /* La barra de pestañas es fija abajo: sin este colchón el último control
+     queda debajo de ella y no se puede tocar. */
+  padding-bottom: calc(var(--toque) + var(--e6) + env(safe-area-inset-bottom));
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Cabecera ─────────────────────────────────────────────────────────────── */
+header {
+  background: color-mix(in srgb, var(--hoja) 82%, transparent);
+  backdrop-filter: var(--vidrio);
+  -webkit-backdrop-filter: var(--vidrio);
+  border-bottom: 1px solid var(--raya);
+  color: var(--tinta);
+  padding: calc(var(--e4) + env(safe-area-inset-top)) var(--e4) var(--e4);
+  position: sticky; top: 0; z-index: 5;
+}
+header h1 { font-family: var(--fuente-titulo); font-size: 19px; font-weight: 600; letter-spacing: -.01em; }
+header p  { font-size: 12.5px; opacity: .75; margin-top: 2px; }
+
+/* ── Estructura ───────────────────────────────────────────────────────────── */
+main    { padding: var(--e4); max-width: 560px; margin: 0 auto; }
+section[hidden] { display: none; }
+
+/* Cada tarjeta es una hoja del cuaderno. La raya no se pinta de fondo sino que
+   la hace el borde inferior de cada renglón: en un libro la línea pertenece a
+   la entrada, no a un intervalo de píxeles.
+
+   Sin `backdrop-filter`: la hoja es opaca, así que no cambiaba un píxel y
+   forzaba una capa de composición por tarjeta. */
+.tarjeta {
+  background: var(--hoja);
+  border: 1px solid var(--raya-fuerte);
+  border-radius: var(--radio);
+  padding: var(--e4);
+  margin-bottom: var(--e4);
+  box-shadow: var(--sombra);
+}
+/* Versalitas grabadas, como el rótulo de una columna del libro. */
+.tarjeta > h2 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .14em;
+  color: var(--tinta-3); font-weight: 700; margin-bottom: var(--e3);
+}
+
+/* ── Controles ────────────────────────────────────────────────────────────── */
+label { display: block; font-size: 12.5px; color: var(--tinta-2); margin-bottom: var(--e1); font-weight: 500; }
+
+input, select, button, textarea {
+  font-family: inherit; font-size: 16px; /* 16px evita el zoom automático de iOS */
+  min-height: var(--toque);
+  border-radius: var(--radio-chico);
+}
+
+input, select, textarea {
+  width: 100%;
+  background: var(--hoja-2);
+  border: 1px solid var(--raya-fuerte);
+  color: var(--tinta);
+  padding: 0 var(--e3);
+}
+textarea { padding: var(--e3); min-height: 0; }
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid var(--timbre); outline-offset: 1px; border-color: transparent;
+}
+
+.campo { margin-bottom: var(--e3); }
+.fila  { display: flex; gap: var(--e2); }
+.fila > * { flex: 1; min-width: 0; }
+
+button {
+  border: none; cursor: pointer; font-weight: 600;
+  padding: 0 var(--e4);
+  /* Papel sobre el teal de timbre: el botón es un sello. */
+  background: var(--timbre); color: var(--tinta-sobre-teal);
+  transition: opacity .15s ease, transform .1s ease;
+}
+button:active   { transform: scale(.985); }
+button:disabled { opacity: .45; cursor: default; }
+button.ancho    { width: 100%; }
+button.secundario {
+  background: var(--hoja-2); color: var(--tinta); border: 1px solid var(--raya-fuerte);
+}
+button.peligro    { background: transparent; color: var(--error); border: 1px solid var(--error); }
+
+/* ── Calendario ───────────────────────────────────────────────────────────── */
+.mes-nav { display: flex; align-items: center; gap: var(--e2); margin-bottom: var(--e3); }
+.mes-nav .titulo { flex: 1; text-align: center; font-weight: 600; }
+/* 44×44 de verdad: son las dos flechas que más se tocan de toda la app, con una
+   mano y en movimiento. Medían 31 de ancho, que es un fallo de puntería cada
+   pocas veces y un mes entero de diferencia cuando falla. */
+.mes-nav button {
+  min-width: 44px; min-height: 44px; padding: 0;
+  background: transparent; color: var(--tinta-2); border: 1px solid var(--raya);
+  font-size: 20px; line-height: 1;
+}
+
+.grilla { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.grilla .dow {
+  text-align: center; font-size: 10.5px; color: var(--tinta-3);
+  text-transform: uppercase; letter-spacing: .06em; padding-bottom: var(--e1);
+}
+.dia {
+  position: relative;
+  aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radio-chico); font-size: 14px; font-variant-numeric: tabular-nums;
+  background: var(--hoja-2); border: 1px solid transparent; color: var(--tinta);
+  cursor: pointer; user-select: none; min-height: 0; padding: 0; font-weight: 500;
+}
+.dia.vacio    { background: transparent; cursor: default; }
+/* .62 y no menos: por debajo de eso el número del día pasado cae bajo 4,5:1 y
+   deja de leerse al sol. Los tonos están medidos a plena opacidad, así que
+   cualquier `opacity` encima se los come. */
+.dia.pasado   { color: var(--tinta-3); opacity: .62; cursor: default; }
+/* Sin disponibilidad: la línea tachada del libro. El rojo aquí se leería como
+   error, y el rojo de este mundo es el del timbre: se reserva para sellar. */
+.dia.ocupado  { background: var(--ocupado); color: var(--ocupado-tx); text-decoration: line-through; }
+.dia.airbnb   { background: var(--ocupado); color: var(--ocupado-tx); text-decoration: line-through;
+                box-shadow: inset 0 0 0 1px var(--airbnb); }
+.dia.sel      { outline: 2px solid var(--timbre); outline-offset: -2px; }
+.dia.rango    { background: var(--parcial); color: var(--timbre); font-weight: 600; }
+/* El día de hoy NO lleva rojo ni borde: el rojo es del selector y sólo del
+   selector. Si los dos se marcan igual, cada vez que hoy cae cerca del rango
+   hay que contar los días para saber cuál es cuál. Hoy es un punto de tinta
+   arriba, una forma distinta que no compite con nada. */
+.dia.hoy      { font-weight: 700; }
+.dia.hoy::after {
+  content: ""; position: absolute; top: 5px; left: 50%; transform: translateX(-50%);
+  width: 4px; height: 4px; border-radius: 50%; background: var(--tinta);
+}
+.dia.hoy.ocupado::after, .dia.hoy.airbnb::after { background: var(--ocupado-tx); }
+
+/* Vista de conjunto: el día muestra cuántas cabañas quedan. Un día con una sola
+   tomada NO es un día ocupado — quedan dos por vender, y pintarlo igual que un
+   lleno haría rechazar reservas que sí caben. */
+.dia.multi    { flex-direction: column; gap: 1px; line-height: 1.05; }
+.dia.parcial  { background: var(--parcial); color: var(--tinta); }
+.dia .libres  { font-size: 8.5px; font-weight: 700; letter-spacing: -.01em; opacity: .8; }
+.dia.rango-multi { outline: 2px solid var(--timbre); outline-offset: -2px; }
+
+.leyenda { display: flex; flex-wrap: wrap; gap: var(--e3); margin-top: var(--e3); font-size: 11.5px; color: var(--tinta-2); }
+/* `display` en el CSS pisa al atributo `hidden` del HTML: sin esta regla las dos
+   leyendas se ven a la vez. Vale para cualquier elemento con display propio. */
+[hidden] { display: none !important; }
+.leyenda i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+/* Mismo punto que lleva el día de hoy en la grilla, para que la leyenda se lea
+   sin traducir nada. */
+.leyenda i.pt-hoy { width: 5px; height: 5px; border-radius: 50%; background: var(--tinta); margin: 0 8px 0 3px; vertical-align: 2px; }
+
+/* ── Mes / Semana ─────────────────────────────────────────────────────────── */
+/* El filtro de cabaña comparte fila con el conmutador de vista: es un control
+   de la misma cosa (qué se está mirando) y tenerlo en su propia tarjeta
+   empujaba el calendario media pantalla hacia abajo. */
+.fila-vistas { display: flex; gap: var(--e2); align-items: center; margin-bottom: var(--e3); }
+.fila-vistas .segmentado { flex: 1; margin-bottom: 0; }
+.fila-vistas select {
+  flex: none; width: auto; max-width: 44%; min-height: 42px;
+  padding: 0 var(--e5) 0 var(--e3); font-size: 12.5px;
+}
+.segmentado {
+  display: flex; gap: 2px; padding: 3px; margin-bottom: var(--e3);
+  background: var(--hoja-2); border: 1px solid var(--raya); border-radius: var(--radio-chico);
+}
+/* 36px de alto, no 44: el objetivo mide 133px de ancho, así que la puntería no
+   es el problema, y una píldora de 44 dentro de una tarjeta se come el sitio
+   del calendario. Pasa el mínimo de WCAG (24×24) con holgura. */
+.segmentado button {
+  flex: 1; min-height: 36px; border-radius: var(--radio-chico); font-size: 12.5px;
+  background: transparent; color: var(--tinta-2);
+}
+.segmentado button[aria-selected="true"] { background: var(--timbre); color: var(--tinta-sobre-teal); }
+
+/* ── Línea de tiempo ──────────────────────────────────────────────────────── */
+/* Una fila por cabaña, una columna por día, y cada estadía es una barra que
+   abarca sus noches. Lo que gana frente a una lista por día es la CONTINUIDAD:
+   una barra del 13 al 16 se lee entera de un vistazo. */
+.tl {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;      /* no arrastra la página al llegar al borde */
+  -webkit-overflow-scrolling: touch;   /* inercia y rebote nativos: no se reimplementan */
+  /* Sin sangrado a los bordes de la tarjeta: el relleno lateral del contenedor
+     de desplazamiento dejaba una franja a la izquierda del rótulo fijo, y por
+     ahí se veían pasar los días al desplazar. El rótulo tiene que anclar
+     exactamente en el borde del área que se desplaza. */
+  padding-bottom: var(--e2);
+}
+.tl-cuerpo {
+  --w-rotulo: 82px;
+  --w-col: 76px;
+  position: relative;
+  width: max-content;
+  min-width: 100%;
+}
+.tl-fila {
+  display: grid;
+  grid-template-columns: var(--w-rotulo) repeat(var(--n-dias), var(--w-col));
+  align-items: center;
+}
+
+/* El rótulo queda fijo al desplazar: sin él, dos columnas más allá ya no se
+   sabe de qué cabaña es la barra que se está mirando. */
+.tl-rotulo {
+  position: sticky; left: 0; z-index: 2;
+  background: var(--hoja);
+  border-right: 1px solid var(--raya-fuerte);
+  padding: var(--e2) var(--e2) var(--e2) 0;
+  font-size: 12px; font-weight: 600; color: var(--tinta-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  /* `stretch` y no `height: 100%`: en la fila de cabecera el rótulo va vacío, y
+     con altura porcentual no llegaba a cubrir — los días se veían pasar por
+     debajo al desplazar. */
+  align-self: stretch; display: flex; align-items: center;
+}
+
+.tl-dia {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  background: transparent; color: var(--tinta-2);
+  border-radius: var(--radio-chico); padding: var(--e2) 0;
+  min-height: 0; font-weight: 500;
+}
+.tl-dow { font-size: 9.5px; text-transform: uppercase; letter-spacing: .1em; color: var(--tinta-3); }
+/* Tracking negativo en el número grande: al crecer, las cifras se leen
+   demasiado separadas. */
+.tl-num { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.tl-dia.pasado   { opacity: .62; }
+/* Relleno de los meses vecinos: están para que la ventana no empiece a mitad de
+   semana, no porque pertenezcan al mes que se está mirando. */
+.tl-dia.de-otro-mes { opacity: .45; }
+/* El día 1 lleva el nombre del mes en vez del día de la semana, y una línea a
+   la izquierda: recorriendo 42 columnas seguidas hay que saber dónde se cruzó. */
+.tl-dia.cambia-mes .tl-dow { color: var(--timbre); font-weight: 700; }
+.tl-dia.es-hoy   { color: var(--timbre); }
+.tl-dia.es-hoy .tl-dow,
+.tl-dia.es-hoy .tl-num { color: var(--timbre); }
+.tl-dia.sel      { outline: 2px solid var(--timbre); outline-offset: -2px; }
+.tl-dia.en-rango { background: var(--parcial); }
+
+/* La retícula es un fondo, no celdas: ver el comentario en `pintarSemana`. Una
+   línea cada columna, empezando después del rótulo. */
+.tl-datos {
+  min-height: var(--alto-fila-tl);
+  background-image: linear-gradient(90deg, var(--raya) 0 1px, transparent 1px);
+  background-size: var(--w-col) 100%;
+  background-position: var(--w-rotulo) 0;
+  background-repeat: repeat-x;
+  border-top: 1px solid var(--raya);
+}
+.tl-cabecera { border-bottom: 1px solid var(--raya-fuerte); }
+
+/* La barra vive en la misma rejilla que las celdas, así que su tramo se declara
+   en columnas y no en píxeles calculados a mano. */
+/* Medios días: la barra abarca también la columna del día de salida, y aquí se
+   le recorta media columna por cada extremo. Empieza a mitad del día de entrada
+   y termina a mitad del de salida — que es lo que pasa de verdad: se van a las
+   11 y entran a las 16. La otra mitad del día queda libre y ahí calza, al ras,
+   la barra de quien toma esa misma cabaña ese mismo día. */
+.tl-barra {
+  grid-row: 1;
+  display: flex; align-items: center; gap: 5px;
+  margin-top: 7px; margin-bottom: 7px;
+  /* El medio día, más una pizca. Tocándose al ras, dos reservas seguidas se
+     leían como una sola barra larga con dos nombres; con 5px de aire entre
+     ellas se ven como dos, y el punto de encuentro sigue estando en el medio
+     del día —el corrimiento es de 2,5px sobre una columna de 76. */
+  margin-left: calc(var(--w-col) / 2 + var(--aire-barra));
+  margin-right: calc(var(--w-col) / 2 + var(--aire-barra));
+  padding: 0 var(--e2);
+  min-height: 42px; border-radius: var(--radio-chico);
+  font-size: 12.5px; font-weight: 600; text-align: left;
+  overflow: hidden; white-space: nowrap;
+  /* El relleno lo pone el estado de pago, más abajo. */
+  background: var(--hoja); color: var(--tinta);
+  border: 1px solid var(--timbre-claro);
+}
+
+/* CUÁNTO SE PAGÓ, EN LA BARRA MISMA. Es el dato que se busca al mirar el mes
+   —quién debe— y hasta ahora obligaba a abrir la ficha una por una.
+     · vacía    = no ha pagado nada
+     · a medias = el anticipo, el 50%
+     · llena    = pagado completo
+   El texto se mantiene en tinta oscura salvo en la llena: un nombre que cruza
+   el borde del degradado no puede cambiar de color a la mitad. */
+.tl-barra[data-pagos="0"] {
+  background: var(--hoja);
+}
+/* El anticipo: degradado SUAVE, del teal lleno al lavado. No un escalón al 50%
+   —eso se leía como dos barras pegadas— sino una transición continua, que es
+   lo que dice "va a medias" sin fingir una precisión que el dato no tiene.
+   El extremo claro es lo más claro que aguanta texto blanco (4,8:1); con la
+   cola en blanco el nombre la cruzaba en las barras cortas y cambiaba de color
+   a la mitad de la palabra. */
+.tl-barra[data-pagos="1"] {
+  background: linear-gradient(90deg,
+    var(--timbre) 0 2%, var(--timbre-lavado) 34%);
+  color: var(--tinta-sobre-teal);
+  border-color: var(--timbre);
+}
+.tl-barra[data-pagos="2"] {
+  background: var(--timbre); color: var(--tinta-sobre-teal);
+  border-color: var(--timbre);
+}
+.tl-barra .tl-nombre { overflow: hidden; text-overflow: ellipsis; }
+.tl-barra .insignia  { flex: none; margin: 0; width: 18px; height: 18px; border-radius: 5px; }
+.tl-barra .insignia svg { width: 11px; height: 11px; }
+/* Un bloqueo no es una venta: no tiene pagos que mostrar, así que se sale de la
+   escala y va en tinta apagada. Va después de las reglas de pago para ganarles. */
+.tl-barra.es-bloqueo,
+.tl-barra.es-bloqueo[data-pagos="0"] {
+  background: var(--ocupado); color: var(--ocupado-tx);
+  border-color: var(--raya-fuerte); border-style: dashed;
+}
+/* Cortada por el borde de la ventana: el canto recto avisa que la estadía sigue
+   fuera de lo que se está viendo, y no que empiece o termine ahí. */
+/* Cortada por el borde: llega al canto sin el medio día ni el aire, porque ahí
+   no hay una salida sino el final de lo que se está mirando. */
+.tl-barra.viene { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: 0; }
+.tl-barra.sigue { border-top-right-radius: 0; border-bottom-right-radius: 0; margin-right: 0; }
+/* La respuesta va en el toque, no al soltar. */
+.tl-barra:active { transform: scale(.985); }
+
+/* Las tres muestras son las barras de verdad, en chico: si la leyenda se dibuja
+   con otros valores, tarde o temprano dice una cosa y la barra otra. */
+.tl-leyenda i { width: 22px; height: 12px; border-radius: 3px; border: 1px solid var(--timbre-claro); }
+.tl-leyenda i.m0 { background: var(--hoja); }
+.tl-leyenda i.m1 { background: linear-gradient(90deg, var(--timbre) 0 2%, var(--timbre-lavado) 34%); border-color: var(--timbre); }
+.tl-leyenda i.m2 { background: var(--timbre); border-color: var(--timbre); }
+
+/* Hoy cruza todas las filas: es lo único que une la rejilla en vertical. */
+.tl-hoy {
+  position: absolute; top: 0; bottom: 0; width: 0;
+  left: calc(var(--w-rotulo) + (var(--i) + .5) * var(--w-col));
+  border-left: 1.5px solid var(--timbre);
+  pointer-events: none; z-index: 1;
+}
+.tl-hoy i {
+  position: absolute; top: -3px; left: -4px;
+  width: 7px; height: 7px; border-radius: 50%; background: var(--timbre);
+}
+
+/* ── Barra de selección ───────────────────────────────────────────────────── */
+.barra-sel p { font-size: 14px; }
+.barra-sel .sub { color: var(--tinta-3); }
+/* El día a la izquierda, el + a la derecha: la mano derecha del pulgar cae ahí,
+   y la información no se corre de sitio al entrar en modo reserva. */
+.cabecera-sel { display: flex; align-items: flex-start; gap: var(--e3); margin-bottom: var(--e3); }
+.cabecera-sel p { flex: 1; min-width: 0; }
+button.mas {
+  flex: none; min-height: 38px; border-radius: var(--radio-chico);
+  padding: 0 var(--e4); font-size: 13px; display: inline-flex; align-items: center; gap: 5px;
+}
+button.mas span { font-size: 18px; font-weight: 700; line-height: 1; margin-top: -2px; }
+
+/* ── Lo que ya está tomado ────────────────────────────────────────────────── */
+.ocupadas { margin-top: var(--e4); border-top: 1px solid var(--raya); padding-top: var(--e3); }
+/* Sin anidar bajo `.ocupadas`: el mismo encabezado lo usa la sección de hoy, y
+   dos definiciones del mismo rótulo terminan separándose. */
+.titulo-ocupadas {
+  font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--tinta-3); margin-bottom: var(--e2);
+}
+.ocupada {
+  background: var(--ocupado); border-radius: var(--radio-chico);
+  padding: var(--e2) var(--e3); margin-bottom: var(--e2);
+}
+.ocupada:last-child { margin-bottom: 0; }
+/* Sin tachar. En el calendario el tachado dice "este día no está disponible";
+   aquí el nombre de la cabaña es un título que hay que leer, y tacharlo lo
+   vuelve difícil de leer sin decir nada nuevo — el título de arriba ya dice que
+   están ocupadas. */
+.ocupada b { display: block; font-size: 14px; color: var(--tinta); }
+/* Quien la tiene pesa más que las fechas: es lo primero que se busca al abrir
+   esto, y hasta ahora se leía más apagado que el dato secundario. */
+.ocupada .sub { display: block; font-size: 12.5px; color: var(--tinta-2); margin-top: 2px; }
+/* Las fechas alineadas bajo el nombre del huésped, no bajo su insignia: así
+   quedan todas en la misma columna aunque los nombres midan distinto. */
+.ocupada .fechas, .ocupada .sin-icono { padding-left: 25px; }
+.ocupada .fechas { color: var(--tinta-3); }
+/* Cada reserva es tocable y abre su ficha. Se pinta como texto, no como botón:
+   dentro de una tarjeta ya gris, un botón más sería ruido. */
+.reserva-mini {
+  display: block; width: 100%; text-align: left; background: transparent; color: inherit;
+  border-radius: var(--radio-chico); padding: var(--e2) 26px var(--e2) var(--e2);
+  margin: 2px 0 0 calc(var(--e2) * -1); font-weight: 500; min-height: 0; position: relative;
+}
+.reserva-mini:hover { background: var(--hoja-2); }
+.reserva-mini .flecha {
+  position: absolute; right: var(--e2); top: 50%; transform: translateY(-50%);
+  color: var(--tinta-3); font-size: 20px; line-height: 1;
+}
+
+/* ── Hoy ──────────────────────────────────────────────────────────────────── */
+.ninguna { font-size: 13.5px; color: var(--tinta-2); margin: 0; }
+
+/* Rótulo de la sección, fuera de toda caja: las tres que vienen debajo son
+   hermanas, y meterlas dentro de una cuarta caja las volvería una sola. */
+.titulo-seccion {
+  font-size: 12px; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--tinta-3); font-weight: 600;
+  margin: 0 var(--e1) var(--e3);
+}
+
+/* Una caja por grupo, con su color en el canto izquierdo. Quien llega y quien
+   se va son dos tareas distintas del día: en una sola lista corrida hay que
+   releer el encabezado para saber en cuál se está. */
+/* El margen rojo es el de la hoja, y por eso es IGUAL en las tres. Antes cada
+   grupo tenía su propio color de canto —rojo, ámbar, gris—, que en este mundo
+   son tres acentos peleando: el libro tiene uno. Lo que separa los grupos es su
+   rótulo, que dice exactamente lo que pasa, y el peso de la tinta.
+   (Raise del Cracktro Scroller: un solo eje ordena la jerarquía.) */
+/* La raya del libro es la de CADA RENGLÓN, no un rayado de intervalo fijo. Lo
+   probé a 28px y cruzaba por detrás del detalle desplegado y de la caja de
+   pagos: en pantalla eso no se lee como un cuaderno, se lee como un fallo de
+   render. Un renglón, una línea —que es lo que ya hace el borde inferior de
+   cada fila— y el margen teal a la izquierda cargan la identidad. */
+.grupo-hoy {
+  border-left: 2px solid var(--timbre-claro);
+  border-radius: 0 var(--radio) var(--radio) 0;
+}
+.grupo-hoy .titulo-ocupadas { display: flex; align-items: center; gap: 7px; }
+/* Los que llegan pesan más que los que se quedan: es la tarea del día. */
+.grupo-hoy.llegan .titulo-ocupadas { color: var(--tinta); }
+.grupo-hoy.sequedan .titulo-ocupadas { color: var(--tinta-3); }
+/* La primera fila de cada caja no lleva su línea de arriba: ya la hace el borde
+   de la propia caja. */
+.grupo-hoy .fila-reserva:first-of-type { padding-top: 0; }
+.pie-hoy {
+  margin: calc(var(--e4) * -1 + var(--e1)) var(--e1) var(--e5);
+  font-size: 12.5px; color: var(--tinta-3);
+}
+/* Se despliega hacia abajo, no en ventana: esta sección se consulta de pasada y
+   una ventana que hay que cerrar para seguir mirando estorba. */
+.fila-reserva .flecha { transition: transform .18s ease; }
+.fila-reserva.abierta { border-bottom: none; }
+.fila-reserva.abierta .flecha { transform: rotate(90deg); color: var(--timbre); }
+/* Sin fondo propio: es la continuación de la fila, no otra tarjeta. Pintarlo
+   más claro lo convertía en el elemento más destacado de la pantalla, y solo es
+   el detalle de una línea. Lo que lo agrupa es el filete de la izquierda. */
+.detalle-hoy {
+  background: var(--hoja);
+  padding: var(--e2) var(--e2) var(--e3) var(--e3);
+  margin: 0 0 var(--e3) var(--e1);
+  border-left: 1px solid var(--raya-fuerte);
+  animation: despliega .18s ease;
+}
+.detalle-hoy .linea-detalle:last-of-type { border-bottom: none; }
+@keyframes despliega { from { opacity: 0; transform: translateY(-6px) } }
+/* Discreto: es una acción secundaria dentro de un detalle, no la de la
+   pantalla. Relleno sólido lo volvía lo más llamativo de todo. */
+.editar-hoy {
+  background: transparent; color: var(--timbre);
+  border: 1px solid color-mix(in srgb, var(--timbre) 40%, transparent);
+  border-radius: var(--radio-chico); min-height: 34px; padding: 0 var(--e4);
+  font-size: 12.5px; margin-top: var(--e2);
+}
+
+/* ── Fila de la lista del mes ─────────────────────────────────────────────── */
+.fila-reserva {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e3);
+  width: 100%; text-align: left; background: transparent; color: var(--tinta);
+  border-bottom: 1px solid var(--raya); border-radius: 0;
+  padding: var(--e3) var(--e1); font-weight: 500; min-height: 0; line-height: 1.45;
+}
+.fila-reserva:last-child { border-bottom: none; }
+.fila-reserva:hover      { background: var(--hoja-2); }
+.fila-reserva .flecha    { flex: none; color: var(--tinta-3); font-size: 22px; line-height: 1; }
+/* Dos reservas seguidas en la misma cabaña: una línea fina las separa. */
+.ocupada .sub + .sub.fechas + .sub { margin-top: var(--e2); }
+
+/* ── Ventana emergente ────────────────────────────────────────────────────── */
+/* Hoja que sube desde abajo: en un teléfono el pulgar llega al borde inferior,
+   no al centro de la pantalla. */
+.modal {
+  position: fixed; inset: 0; z-index: 40;
+  background: var(--velo);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  display: flex; align-items: flex-end; justify-content: center;
+  animation: velo .18s ease;
+}
+@keyframes velo { from { opacity: 0 } }
+/* Entra desde abajo y se materializa: el desenfoque y la escala se mueven junto
+   con el desplazamiento, así la hoja llega como un material y no como una
+   opacidad que sube. */
+@keyframes sube {
+  from { transform: translateY(22px) scale(.99); opacity: 0; filter: blur(2px); }
+}
+
+/* La salida es el camino de entrada al revés, con la curva espejada: si algo se
+   va por otro lado del que vino, se pierde de dónde estaba. Es más rápida que
+   la entrada porque al cerrar ya se decidió y esperar molesta. */
+@keyframes baja {
+  to { transform: translateY(22px) scale(.99); opacity: 0; filter: blur(2px); }
+}
+@keyframes velo-fuera { to { opacity: 0 } }
+.modal.cerrando            { animation: velo-fuera .18s ease forwards; }
+.modal.cerrando .modal-caja { animation: baja .18s cubic-bezier(.64, 0, .78, 0) forwards; }
+
+.modal-caja {
+  width: 100%; max-width: 560px;
+  max-height: 92vh; display: flex; flex-direction: column;
+  background: var(--hoja);
+  border: 1px solid var(--raya-fuerte);
+  border-radius: var(--radio) var(--radio) 0 0;
+  box-shadow: var(--sombra-hoja);
+  animation: sube .22s cubic-bezier(.22, 1, .36, 1);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@media (min-width: 620px) {
+  .modal { align-items: center; }
+  .modal-caja { border-radius: var(--radio); }
+}
+
+.modal-cabecera {
+  display: flex; align-items: flex-start; gap: var(--e3);
+  padding: var(--e4) var(--e4) var(--e3);
+  border-bottom: 1px solid var(--raya);
+}
+.modal-cabecera h3 { font-size: 17px; font-weight: 600; }
+.modal-cabecera p  { font-size: 12.5px; color: var(--tinta-3); margin-top: 2px; }
+.cerrar {
+  background: transparent; color: var(--tinta-2); border: 1px solid var(--raya);
+  min-height: 34px; width: 34px; padding: 0; font-size: 20px; line-height: 1;
+  border-radius: 50%; flex-shrink: 0;
+}
+.modal-cuerpo { padding: var(--e4); overflow-y: auto; }
+
+/* Opción de cabaña dentro de la ventana: toda la fila es tocable. */
+.opcion-cabana {
+  width: 100%; text-align: left; background: var(--hoja-2);
+  border: 1px solid var(--raya-fuerte); color: var(--tinta);
+  border-radius: var(--radio-chico); padding: var(--e3) var(--e4);
+  margin-bottom: var(--e2); min-height: 62px;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e3);
+  font-weight: 500;
+}
+.opcion-cabana .cap { font-size: 12.5px; color: var(--tinta-3); font-weight: 400; }
+.opcion-cabana .flecha { color: var(--timbre); font-size: 20px; }
+
+/* ── Alta por pasos ───────────────────────────────────────────────────────── */
+/* Tres rayas en vez de "Paso 2 de 3": ocupa menos, se lee sin leer, y en un
+   asistente de tres pasos el número exacto no cambia lo que uno hace. */
+.pasos { display: flex; gap: 5px; margin-bottom: var(--e4); }
+.pasos span {
+  flex: 1; height: 3px; border-radius: var(--radio-chico); background: var(--raya); /* la regla del paso sí es redonda */
+  transition: background .25s ease;
+}
+.pasos span.hecho { background: var(--timbre); }
+/* Recordatorio de lo ya decidido en el último paso: sin él hay que retroceder
+   para comprobar que la cabaña y las fechas son las que uno cree. */
+.resumen-alta {
+  margin-top: var(--e4); padding-top: var(--e2);
+  border-top: 1px solid var(--raya);
+}
+.resumen-alta .linea-detalle { border-bottom: none; padding: 3px 0; font-size: 12.5px; }
+
+/* ── Canales de venta ─────────────────────────────────────────────────────── */
+.canales { display: flex; gap: var(--e2); flex-wrap: wrap; }
+.canal {
+  flex: 1 1 0; min-width: 74px; min-height: 62px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  background: var(--hoja-2); border: 1px solid var(--raya-fuerte);
+  border-radius: var(--radio-chico); color: var(--tinta-2);
+  font-size: 11px; font-weight: 600; padding: var(--e2) 4px;
+}
+/* El icono va dentro de su insignia de color, no suelto: los SVG de los canales
+   son blancos —están hechos para ir sobre el color de cada marca— y sobre un
+   chip claro desaparecían. De paso, el chip enseña el color real del canal. */
+.canal .insignia { width: 26px; height: 26px; margin: 0; vertical-align: 0; border-radius: 8px; }
+.canal .insignia svg { width: 16px; height: 16px; }
+.canal[aria-pressed="true"] {
+  border-color: var(--timbre); background: var(--hoja);
+  color: var(--tinta); box-shadow: inset 0 0 0 1px var(--timbre);
+}
+
+/* Insignia del canal en la lista. El color hace el trabajo: se reconoce de un
+   vistazo sin leer, que es el punto de tener logo y no texto. */
+.insignia {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 6px; vertical-align: -5px; margin-right: 5px;
+}
+.insignia svg { width: 13px; height: 13px; }
+.insignia.whatsapp  { background: #25D366; }
+.insignia.instagram { background: linear-gradient(45deg, #F9CE34, #EE2A7B 55%, #6228D7); }
+.insignia.airbnb    { background: #FF5A5F; }
+.insignia.directo   { background: var(--timbre); }
+.insignia.otro      { background: var(--tinta-3); }
+
+/* Reserva que entro por la web y todavia no esta pagada. Ambar, no rojo: no
+   es un error, es un aviso de que esa fecha aun no esta vendida y puede
+   soltarse sola. Va junto al nombre porque es ahi donde se decide si contar
+   con ella o no. */
+.etiqueta-pendiente {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+  vertical-align: 1px;
+  color: #7a4b00;
+  background: #ffe8b8;
+  border: 1px solid #e8bf72;
+}
+
+/* ── Pagos ────────────────────────────────────────────────────────────────── */
+/* Se cobra en dos mitades. La caja se llena hasta la mitad con el anticipo y se
+   completa con el saldo, y el color se MANTIENE — no parpadea. Un parpadeo
+   significa "esto necesita algo de ti ahora"; un pago recibido no necesita
+   nada, solo tiene que verse de un vistazo. */
+.barra-pagos {
+  display: flex; gap: 2px; margin-bottom: var(--e3);
+  border-radius: var(--radio-chico); overflow: hidden;
+  border: 1px solid var(--raya);
+}
+.barra-pagos .mitad {
+  flex: 1; padding: var(--e2) var(--e3); min-width: 0;
+  background: var(--hoja); transition: background .35s ease, color .35s ease;
+}
+.barra-pagos .mitad.pagada {
+  background: var(--timbre-palido);
+  box-shadow: inset 0 0 0 1px var(--timbre-claro);
+}
+.barra-pagos .etiqueta {
+  display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--tinta-3); font-weight: 700;
+}
+.barra-pagos .mitad.pagada .etiqueta { color: var(--timbre); }
+.barra-pagos .valor { font-size: 14px; font-weight: 600; color: var(--tinta-3); }
+.barra-pagos .mitad.pagada .valor { color: var(--tinta); }
+.pagado-todo {
+  margin: calc(var(--e3) * -1 + 2px) 0 var(--e3);
+  font-size: 12.5px; color: var(--timbre); font-weight: 600;
+  text-transform: uppercase; letter-spacing: .1em;
+}
+
+.pago-fila {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e2);
+  padding: var(--e2) 0; border-bottom: 1px solid var(--raya);
+}
+.pago-fila:last-child { border-bottom: none; }
+.pago-quien b    { display: block; font-size: 13px; }
+.pago-quien span { font-size: 12px; color: var(--tinta-3); }
+.pago-acciones   { display: flex; gap: var(--e2); flex: none; }
+.chip {
+  min-height: 30px; padding: 0 var(--e3); border-radius: var(--radio-chico); font-size: 12px;
+  background: transparent; color: var(--timbre);
+  border: 1px solid color-mix(in srgb, var(--timbre) 40%, transparent);
+}
+.chip.marcar { background: var(--timbre); color: var(--tinta-sobre-teal); border-color: var(--timbre); }
+.chip.suave  { color: var(--tinta-3); border-color: var(--raya-fuerte); }
+
+.comprobante {
+  width: 100%; border-radius: var(--radio-chico); display: block;
+  background: var(--hoja); border: 1px solid var(--raya);
+}
+
+/* La misma lectura en las listas, sin ocupar una línea: la fila se rellena de
+   izquierda a derecha, media o entera.
+
+   Los selectores van ACOTADOS a las filas de lista. Sueltos, `[data-pagos]`
+   alcanzaba también a las barras de la línea de tiempo y les pintaba encima un
+   lavado que peleaba con su propio relleno. */
+.fila-reserva[data-pagos="1"], .fila-reserva[data-pagos="2"] { background-repeat: no-repeat; }
+.fila-reserva[data-pagos="1"] {
+  background-image: linear-gradient(90deg,
+    color-mix(in srgb, var(--timbre-palido) 60%, transparent),
+    color-mix(in srgb, var(--timbre-palido) 15%, transparent));
+  background-size: 50% 100%;
+}
+.fila-reserva[data-pagos="2"] {
+  background-image: linear-gradient(90deg,
+    color-mix(in srgb, var(--timbre-palido) 70%, transparent),
+    color-mix(in srgb, var(--timbre-palido) 30%, transparent));
+  background-size: 100% 100%;
+}
+
+/* ── Aseos ────────────────────────────────────────────────────────────────── */
+/* En esta vista las reservas NO son el tema: solo sitúan. Van en gris, sin el
+   código de pagos, para que lo único con color sea el aseo. */
+.tl-barra.gris {
+  background: var(--ocupado); color: var(--ocupado-tx);
+  border-color: var(--raya-fuerte); font-weight: 500;
+  cursor: default;
+}
+.tl-barra.gris:active { transform: none; }
+
+/* Dos niveles, y solo dos. El día con aseo va perfilado; el que además tiene
+   entrada ese mismo día va lleno, porque es el único que no se puede correr. */
+.aseo-marca {
+  grid-row: 1; align-self: center; justify-self: center;
+  width: 23px; height: 23px; border-radius: 50%; z-index: 2;
+  border: 2px solid var(--timbre); background: var(--hoja);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--timbre);
+}
+.aseo-marca svg { width: 14px; height: 14px; display: block; }
+.aseo-marca.doble {
+  background: var(--timbre); color: var(--tinta-sobre-teal);
+  box-shadow: 0 0 0 3px var(--timbre-palido);
+}
+.tl-dia.aseo-hay .tl-num   { color: var(--timbre); }
+.tl-dia.aseo-doble         { background: var(--timbre-palido); border-radius: var(--radio-chico); }
+.tl-dia.aseo-doble .tl-num,
+.tl-dia.aseo-doble .tl-dow { color: var(--timbre); font-weight: 700; }
+
+/* La muestra es la marca real en chico, con su escoba: si la leyenda se dibuja
+   con otro elemento, tarde o temprano dice una cosa y la marca otra. */
+.tl-leyenda i.aseo-m {
+  width: 18px; height: 18px; border-radius: 50%; flex: none;
+  border: 2px solid var(--timbre); background: var(--hoja); color: var(--timbre);
+  display: inline-flex; align-items: center; justify-content: center;
+  vertical-align: -5px; margin-right: 5px;
+}
+.tl-leyenda i.aseo-m svg { width: 9px; height: 9px; display: block; }
+.tl-leyenda i.aseo-m.doble { background: var(--timbre); color: var(--tinta-sobre-teal); }
+
+/* El día con salida Y entrada es el único que no admite postergarse, así que es
+   el único que se marca. Marcar todos sería no marcar ninguno. */
+.aseo-dia.urgente { border-left: 3px solid var(--timbre); }
+.aseo-cabecera {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e2);
+  margin-bottom: var(--e3); font-size: 14px;
+}
+/* La condición, no una alarma: mismo acento que todo lo demás, en versalitas
+   como el resto de los rótulos del libro. */
+.aseo-aviso {
+  text-transform: uppercase; letter-spacing: .09em; font-size: 11px; font-weight: 700;
+  color: var(--timbre);
+}
+.aseo-linea {
+  padding: var(--e2) 0; border-top: 1px solid var(--raya);
+}
+/* Hijo directo: sin el `>`, la regla alcanzaba también al `<b>` de dentro del
+   aviso y le partía la frase en tres líneas. */
+/* El número manda y el nombre queda de apoyo: quien limpia las conoce por
+   número, y el nombre solo sirve para no dudar de cuál se trata. */
+.aseo-linea > b   { display: inline; font-size: 14px; }
+.aseo-cab         { font-size: 12px; color: var(--tinta-3); margin-left: 6px; }
+.aseo-mov         { display: block; font-size: 12.5px; color: var(--tinta-2); margin-top: 2px; }
+.aseo-aviso {
+  margin-top: var(--e2); padding: 5px var(--e3);
+  background: var(--timbre-palido); border-radius: var(--radio-chico);
+  display: inline-block; line-height: 1.4;
+}
+
+/* ── Finanzas ─────────────────────────────────────────────────────────────── */
+/* Dos cifras que casi todos los paneles mezclan en una: lo que YA está en la
+   cuenta y lo que falta cobrar. Se muestran juntas y separadas a la vez. */
+.cifra-mes {
+  font-size: 34px; font-weight: 700; letter-spacing: -.03em; line-height: 1.05;
+  font-variant-numeric: tabular-nums; color: var(--tinta);
+}
+.cifra-pie { font-size: 12.5px; color: var(--tinta-3); margin-top: 2px; }
+
+.barra-plata {
+  display: flex; height: 14px; margin: var(--e4) 0 var(--e3);
+  border-radius: 3px; overflow: hidden;
+  border: 1px solid var(--timbre-claro);
+}
+.barra-plata .parte { transition: width .35s ease; }
+.barra-plata .cobrado { background: var(--timbre); }
+/* Rayado, no un color más: lo pendiente no es otra categoría de plata, es la
+   misma sin llegar todavía. La trama lo dice sin inventar un segundo acento. */
+.barra-plata .pendiente {
+  background: repeating-linear-gradient(45deg,
+    var(--timbre-palido) 0 4px, var(--hoja) 4px 8px);
+}
+.linea-detalle .pt {
+  display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+  margin-right: 6px; vertical-align: -1px; border: 1px solid var(--timbre-claro);
+}
+.linea-detalle .pt.cobrado   { background: var(--timbre); }
+.linea-detalle .pt.pendiente {
+  background: repeating-linear-gradient(45deg,
+    var(--timbre-palido) 0 3px, var(--hoja) 3px 6px);
+}
+
+/* Los turnos van listados, no solo contados: "3 turnos" no deja comprobar
+   nada, y la pregunta que sigue a la cifra es siempre cuáles fueron. */
+.turnos-tinaja { margin-top: var(--e4); border-top: 1px solid var(--raya); }
+.turnos-tinaja .linea-detalle span:last-child { color: var(--tinta-3); }
+
+/* ── Gráfico del año ──────────────────────────────────────────────────────── */
+/* Una cifra sola no dice si el mes fue bueno; al lado de los otros once, sí.
+   Por eso el resumen es el gráfico y la ficha va debajo, no al revés. */
+.gr {
+  --gr-alto: 10.5rem; --gr-ancho-col: 52px;
+  /* Curva sin rebote: es un dato cambiando de valor, no algo que se lanzó.
+     El rebote se gana con un gesto que traía impulso, y aquí no hay ninguno. */
+  --gr-t: .34s;
+  --gr-curva: cubic-bezier(.22, 1, .36, 1);
+}
+.gr-cab {
+  display: flex; justify-content: space-between;
+  font-size: 12px; color: var(--tinta-3);
+  margin-bottom: var(--e2);
+}
+
+/* La pista se arrastra en horizontal: doce meses no caben en un teléfono y
+   comprimirlos hasta que quepan deja barras que no se distinguen. */
+.gr-pista {
+  overflow-x: auto; overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  margin-inline: calc(-1 * var(--e3));   /* sangra hasta el borde de la tarjeta */
+  padding-inline: var(--e3);
+}
+.gr-pista::-webkit-scrollbar { display: none; }
+
+.gr-lienzo { position: relative; width: max-content; min-width: 100%; }
+/* Rejilla de fondo: solo tres líneas. Con más, el gráfico se lee como una
+   tabla y deja de leerse como una silueta. */
+.gr-rejilla {
+  position: absolute; left: 0; right: 0; top: 0; height: var(--gr-alto);
+  background:
+    linear-gradient(var(--raya), var(--raya)) no-repeat 0 0    / 100% 1px,
+    linear-gradient(var(--raya), var(--raya)) no-repeat 0 50%  / 100% 1px,
+    linear-gradient(var(--raya), var(--raya)) no-repeat 0 100% / 100% 1px;
+}
+
+.gr-cols { position: relative; display: flex; gap: 6px; }
+.gr-col {
+  flex: 0 0 auto; width: var(--gr-ancho-col);
+  display: flex; flex-direction: column; align-items: center; gap: var(--e2);
+  background: none; border: 0; padding: 0; cursor: pointer;
+  scroll-snap-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+/* La barra crece desde abajo: el suelo es el cero y no se mueve. */
+.gr-barra {
+  width: 100%; height: var(--gr-alto);
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.gr-cuerpo {
+  position: relative; width: 100%;
+  background: linear-gradient(var(--timbre-lavado), var(--timbre));
+  border-radius: 5px 5px 0 0;
+  transition: height var(--gr-t) var(--gr-curva);
+}
+/* Lo que falta cobrar va SIEMPRE dibujado, en su sitio y con su altura; solo
+   está transparente hasta que el mes se elige. Por eso cambiar de mes no
+   reconstruye la barra: se revela un recorte que ya estaba ahí, y la altura
+   total no se mueve ni un píxel. */
+.gr-pend {
+  position: absolute; left: 0; right: 0; top: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--timbre); border-bottom: 0;
+  border-radius: 5px 5px 0 0;
+  background: repeating-linear-gradient(45deg,
+    var(--timbre-palido) 0 4px, var(--hoja) 4px 8px);
+  opacity: 0;
+  transition: opacity var(--gr-t) var(--gr-curva),
+              height  var(--gr-t) var(--gr-curva);
+}
+.gr-col.es .gr-pend { opacity: 1; }
+
+.gr-mes {
+  font-size: 12px; line-height: 1; color: var(--tinta-3);
+  padding: 5px 9px; border-radius: 999px;
+  transition: background var(--gr-t) var(--gr-curva),
+              color      var(--gr-t) var(--gr-curva),
+              transform  .12s ease-out;
+}
+.gr-col.es .gr-mes { background: var(--tinta); color: var(--hoja); font-weight: 600; }
+/* Al pulsar, no al soltar: el retardo entre el dedo y la respuesta es lo que
+   hace que una interfaz deje de sentirse directa. */
+.gr-col:active .gr-mes { transform: scale(.93); }
+.gr-col:active .gr-cuerpo { opacity: .72; }
+
+/* La ficha son cifras distintas, no las mismas movidas: se reemplaza y entra
+   desde abajo, en el mismo tiempo que tarda la barra en revelarse. */
+.gr-ficha {
+  margin-top: var(--e4); padding-top: var(--e3); border-top: 1px solid var(--raya);
+  animation: gr-entra var(--gr-t) var(--gr-curva) both;
+}
+@keyframes gr-entra { from { opacity: 0; transform: translateY(7px); } }
+.gr-ficha h3 {
+  font-family: var(--fuente-titulo); font-size: 17px; font-weight: 700;
+  letter-spacing: -.01em; margin: 0 0 var(--e2);
+}
+.gr-ficha .gr-total b { font-size: 16px; }
+.gr-ficha .cifra-pie { margin-top: var(--e2); }
+
+/* Con movimiento reducido se quitan los desplazamientos, no el aviso: la
+   píldora y la trama siguen cambiando, solo que de golpe. Apagar también el
+   cambio de estado dejaría al usuario sin saber qué mes está mirando. */
+@media (prefers-reduced-motion: reduce) {
+  .gr-mes, .gr-cuerpo, .gr-pend { transition: none; }
+  .gr-ficha { animation: none; }
+  .gr-col:active .gr-mes { transform: none; }
+}
+
+/* ── Pellet ───────────────────────────────────────────────────────────────── */
+.pellet-cifra { text-align: center; margin-top: var(--e3); }
+.pellet-fila  { padding: var(--e3) 0; border-bottom: 1px solid var(--raya); }
+.pellet-fila:last-child { border-bottom: none; }
+.pellet-cab {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e2);
+  font-size: 13.5px; margin-bottom: var(--e2);
+}
+.pellet-host {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--tinta-3); font-weight: 600;
+}
+.pellet-barra { height: 8px; background: var(--hoja-2); border-radius: 2px; overflow: hidden; }
+.pellet-barra span { display: block; height: 100%; background: var(--timbre); }
+
+.canal-fila { padding: var(--e3) 0; border-bottom: 1px solid var(--raya); }
+.canal-fila:last-child { border-bottom: none; }
+.canal-cab {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--e2);
+  font-size: 13.5px;
+}
+.canal-n { font-size: 12px; color: var(--tinta-3); font-variant-numeric: tabular-nums; }
+.canal-fila .barra-plata { height: 10px; margin: var(--e2) 0 0; }
+
+/* ── Mensajes ─────────────────────────────────────────────────────────────── */
+.aviso {
+  border-radius: var(--radio-chico); padding: var(--e3);
+  font-size: 13.5px; margin-bottom: var(--e3); line-height: 1.45;
+}
+/* El total no es una alerta: es la cifra anotada. Va como una casilla del libro
+   —fondo de hoja y filete— y no como un campo de color. Pintado de rojo pálido
+   ocupaba media pantalla gritando algo que solo hay que leer. */
+.aviso.ok {
+  background: var(--hoja-2); color: var(--tinta);
+  border: 1px solid var(--raya-fuerte);
+  border-left: 3px solid var(--timbre-claro);
+}
+.aviso.error { background: color-mix(in srgb, var(--error) 12%, transparent); color: var(--error); }
+.aviso.info  { background: var(--hoja-2); color: var(--tinta-2); border: 1px solid var(--raya); }
+
+/* ── Cotización ───────────────────────────────────────────────────────────── */
+.total { font-family: var(--fuente-titulo); font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+.linea-detalle {
+  display: flex; justify-content: space-between; gap: var(--e3);
+  padding: var(--e2) 0; border-top: 1px solid var(--raya); font-size: 13.5px;
+}
+.linea-detalle:first-child { border-top: none; }
+.linea-detalle b { font-variant-numeric: tabular-nums; }
+
+.lista-vacia { text-align: center; color: var(--tinta-3); font-size: 13.5px; padding: var(--e5) var(--e3); }
+
+/* ── Pestañas ─────────────────────────────────────────────────────────────── */
+/* Abajo, al alcance del pulgar. Es un panel que se usa de pie y con una mano. */
+nav.tabs {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
+  display: flex; background: color-mix(in srgb, var(--hoja) 82%, transparent);
+  border-top: 1px solid var(--raya);
+  padding-bottom: env(safe-area-inset-bottom);
+  /* Sin esto, el contenido que pasa por detrás se lee entero a través de la
+     barra y parece texto roto encima de las pestañas. */
+  backdrop-filter: var(--vidrio); -webkit-backdrop-filter: var(--vidrio);
+}
+nav.tabs button {
+  flex: 1; background: transparent; color: var(--tinta-3);
+  font-size: 11.5px; font-weight: 600; min-height: var(--toque);
+  border-radius: 0; padding: 0; letter-spacing: .01em;
+}
+nav.tabs button[aria-selected="true"] { color: var(--timbre); box-shadow: inset 0 2px 0 var(--timbre); }
+
+/* ── Movimiento reducido ──────────────────────────────────────────────────── */
+/* NO se apaga todo a 0.01s. Ese truco quita el mareo y de paso borra la señal
+   de que algo cambió: una ventana que aparece de golpe, sin nada, se lee como
+   un fallo de la pantalla.
+
+   Lo que marea son los DESPLAZAMIENTOS. Se quitan esos y se dejan fundidos
+   cortos, que informan del cambio sin mover nada por la pantalla. */
+@media (prefers-reduced-motion: reduce) {
+  .modal-caja  { animation: aparece .16s ease; }
+  .detalle-hoy { animation: aparece .14s ease; }
+  .modal       { animation: aparece .14s ease; }
+  /* La salida también: sin desplazamiento ni desenfoque, solo el fundido. */
+  .modal.cerrando,
+  .modal.cerrando .modal-caja { animation: velo-fuera .14s ease forwards; }
+  /* La flecha del desplegable gira igual: es un estado, no un adorno, y sin
+     ella no se sabe si la fila está abierta. Solo se acorta. */
+  .fila-reserva .flecha { transition-duration: .05s; }
+  html { scroll-behavior: auto; }
+}
+@keyframes aparece { from { opacity: 0 } }
+
+/* ── Login ────────────────────────────────────────────────────────────────── */
+.login { max-width: 340px; margin: 12vh auto; padding: var(--e4); }
+.login h1 { font-family: var(--fuente-titulo); font-size: 24px; text-align: center; margin-bottom: var(--e2); color: var(--timbre); }
+.login p.sub { text-align: center; color: var(--tinta-3); font-size: 13px; margin-bottom: var(--e5); }
+
+
+/* == Huespedes ============================================================ */
+/* Todo con los tokens del panel: si cambia --timbre, cambia esto tambien. */
+
+.hu-lista { display: flex; flex-direction: column; gap: 10px; }
+
+.hu-card {
+  background: var(--hoja);
+  border: 1px solid var(--raya);
+  border-radius: var(--radio);
+  padding: 14px 15px;
+  box-shadow: var(--sombra-hoja);
+}
+.hu-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.hu-card-top b { font-size: 15px; color: var(--tinta); }
+.hu-card-sub { font-size: 12px; color: var(--tinta-3); margin-top: 2px; }
+
+.hu-pill {
+  flex-shrink: 0;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase;
+  padding: 4px 9px; border-radius: 999px;
+  background: var(--raya); color: var(--tinta-3);
+  white-space: nowrap;
+}
+.hu-pill.ok { background: var(--timbre-palido); color: var(--timbre); }
+
+.hu-card-acciones { display: flex; gap: 8px; margin-top: 12px; }
+.hu-btn-wa, .hu-btn-chat {
+  flex: 1; min-height: var(--toque);
+  border-radius: 999px; border: 1px solid var(--raya);
+  font-family: var(--fuente); font-size: 12.5px; font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.12s, background 0.18s;
+}
+.hu-btn-wa   { background: #25d366; border-color: #25d366; color: #0b2b16; }
+.hu-btn-chat { background: var(--hoja-2); color: var(--tinta); }
+.hu-btn-wa:active, .hu-btn-chat:active { transform: scale(0.97); }
+
+/* -- Solicitudes -- */
+.hu-filtros { display: flex; gap: 7px; margin-bottom: 12px; }
+.hu-filtros button {
+  border: 1px solid var(--raya); background: var(--hoja);
+  color: var(--tinta-3);
+  border-radius: 999px; padding: 7px 14px; min-height: 36px;
+  font-family: var(--fuente); font-size: 12.5px; font-weight: 600;
+  cursor: pointer;
+}
+.hu-filtros button[aria-selected="true"] {
+  background: var(--timbre); border-color: var(--timbre); color: var(--tinta-sobre-teal);
+}
+
+.hu-sol {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--hoja);
+  border: 1px solid var(--raya);
+  /* La franja de color a la izquierda permite distinguir de un vistazo una
+     averia de un pedido de pellet sin tener que leer. */
+  border-left: 3px solid var(--tinta-3);
+  border-radius: var(--radio-chico);
+  padding: 12px 14px;
+}
+.hu-sol.tipo-falla  { border-left-color: var(--error); }
+.hu-sol.tipo-pellet { border-left-color: var(--alerta); }
+.hu-sol.tipo-tinaja { border-left-color: var(--timbre); }
+.hu-sol.hecha { opacity: 0.5; }
+
+.hu-sol-main { flex: 1; min-width: 0; }
+.hu-sol-head { display: flex; align-items: baseline; gap: 8px; }
+.hu-sol-tipo { font-size: 13px; font-weight: 700; color: var(--tinta); }
+.hu-sol-hace { font-size: 11px; color: var(--tinta-3); }
+.hu-sol-quien { font-size: 12px; color: var(--tinta-2); margin-top: 2px; }
+.hu-sol-detalle { font-size: 12.5px; color: var(--tinta-2); margin-top: 3px; line-height: 1.45; overflow-wrap: anywhere; }
+
+.hu-sol-btn {
+  flex-shrink: 0; min-height: 38px;
+  border: 1px solid var(--raya); background: var(--hoja-2); color: var(--tinta);
+  border-radius: 999px; padding: 0 13px;
+  font-family: var(--fuente); font-size: 12px; font-weight: 600;
+  cursor: pointer;
+}
+.hu-sol-btn:active { transform: scale(0.96); }
+.hu-sol-ok { flex-shrink: 0; font-size: 11.5px; font-weight: 600; color: var(--ok); }
+
+/* -- Badge de la pestania -- */
+.hu-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 17px; height: 17px; padding: 0 4px; margin-left: 5px;
+  border-radius: 999px;
+  background: var(--error); color: #fff;
+  font-size: 10px; font-weight: 700; line-height: 1;
+  vertical-align: 1px;
+}
+
+/* -- Conversacion dentro del modal -- */
+.hu-chat {
+  display: flex; flex-direction: column; gap: 9px;
+  max-height: 46vh; overflow-y: auto;
+  padding: 4px 2px 10px;
+}
+.hu-msg { max-width: 84%; display: flex; flex-direction: column; gap: 2px; }
+.hu-msg.host    { align-self: flex-end; align-items: flex-end; }
+.hu-msg.huesped { align-self: flex-start; }
+.hu-msg-txt {
+  padding: 9px 12px; border-radius: 13px;
+  font-size: 13.5px; line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.hu-msg.host .hu-msg-txt    { background: var(--timbre); color: var(--tinta-sobre-teal); border-bottom-right-radius: 4px; }
+.hu-msg.huesped .hu-msg-txt { background: var(--hoja-2); color: var(--tinta); border-bottom-left-radius: 4px; }
+.hu-msg-hora { font-size: 10px; color: var(--tinta-3); padding: 0 3px; }
+
+.hu-chat-bar { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid var(--raya); }
+#hu-chat-input {
+  flex: 1; min-width: 0; min-height: var(--toque);
+  border: 1px solid var(--raya); border-radius: 999px;
+  background: var(--hoja); color: var(--tinta);
+  padding: 0 14px;
+  font-family: var(--fuente); font-size: 13.5px;
+}
+#hu-chat-input:focus { outline: none; border-color: var(--timbre); }
+#hu-chat-send {
+  flex-shrink: 0; min-height: var(--toque);
+  border: none; border-radius: 999px;
+  background: var(--timbre); color: var(--tinta-sobre-teal);
+  padding: 0 18px;
+  font-family: var(--fuente); font-size: 12.5px; font-weight: 700;
+  cursor: pointer;
+}
+#hu-chat-send:active { transform: scale(0.97); }
+
+/* Aprobar / rechazar un turno de tinaja. Dos acciones opuestas necesitan dos
+   colores distintos: si se parecen, tarde o temprano se pulsa la equivocada. */
+.hu-sol-tinaja { display: flex; flex-direction: column; gap: 5px; flex-shrink: 0; }
+.hu-sol-si, .hu-sol-no {
+  min-height: 34px; padding: 0 13px;
+  border-radius: 999px; cursor: pointer;
+  font-family: var(--fuente); font-size: 12px; font-weight: 700;
+  border: 1px solid transparent;
+}
+.hu-sol-si { background: var(--ok); color: #fff; }
+.hu-sol-no { background: transparent; color: var(--tinta-3); border-color: var(--raya-fuerte); }
+.hu-sol-si:active, .hu-sol-no:active { transform: scale(0.96); }

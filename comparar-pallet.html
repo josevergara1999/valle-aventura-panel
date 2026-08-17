@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pallet · niveles</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="pallet.css">
+<style>
+  body{
+    margin:0; padding:16px 12px 48px;
+    background:var(--papel); color:var(--tinta);
+    font:400 15px/1.5 system-ui, -apple-system, sans-serif;
+  }
+  h1{ font-size:15px; letter-spacing:.06em; text-transform:uppercase; color:var(--tinta-3);
+      margin:0 0 16px; font-weight:600; }
+  .par{ display:grid; grid-template-columns:repeat(5, 1fr); gap:8px; align-items:end; }
+  .caja{ background:var(--hoja); border:1px solid var(--raya); border-radius:var(--radio);
+         padding:10px 8px 8px; }
+  .cab{ display:flex; justify-content:space-between; align-items:baseline;
+        font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+        color:var(--tinta-3); margin-bottom:4px; }
+  .cifra{ font-size:13px; font-weight:700; color:var(--tinta); letter-spacing:0; }
+</style>
+</head>
+<body>
+
+<h1>Pallet · cómo baja</h1>
+<div id="salida"></div>
+
+<script src="pallet.js"></script>
+<script>
+  const NIVELES = [70, 43, 12, 3, 0];
+  document.getElementById('salida').innerHTML = `<div class="par">` + NIVELES.map(n => `
+      <div class="caja">
+        <div class="cab"><span>sacos</span><span class="cifra">${n}</span></div>
+        ${palletHTML(n, 70)}
+      </div>`).join('') + `</div>`;
+</script>
+</body>
+</html>

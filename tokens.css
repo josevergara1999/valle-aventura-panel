@@ -1,0 +1,109 @@
+/* ============================================================================
+   Valle Aventura — el libro de registro, en Deep Focus
+   ============================================================================
+   ESTE ES EL ÚNICO ARCHIVO QUE HAY QUE TOCAR PARA CAMBIAR LA IDENTIDAD VISUAL.
+
+   La estructura es el cuaderno de registro de un refugio: margen, renglones,
+   versalitas grabadas y timbres. La PALETA está fijada por el usuario y es la
+   que manda sobre cualquier otra consideración:
+
+     Mist White   #F2F1EC   ← predominante
+     Deep Teal    #143D4A   ← el único acento
+     Slate Grey   #7B8187
+     Basalt Black #1E1E1E
+
+   Los nombres de los tokens describen el ROL, no el color —papel, hoja, tinta,
+   timbre—, y por eso cambiar la paleta fue cambiar valores y no renombrar medio
+   CSS. Si algún día entra otra, se cambia aquí y nada más.
+
+   Dos reglas que no se negocian:
+
+   · El blanco domina. Los campos de color son la excepción, no el suelo.
+   · Un solo acento, el teal. En cuanto aparezca un segundo, la jerarquía se
+     reparte y deja de mandar la tinta.
+
+   Los tonos de texto están MEDIDOS contra la superficie más clara en que
+   aparecen, todos por sobre 4,5:1. Esto se lee al sol de Las Trancas: el slate
+   grey puro da 3,2:1 sobre el blanco niebla, así que para TEXTO se usa su
+   versión honda; el original queda para filetes y puntos, donde no se lee.
+   ============================================================================ */
+
+:root {
+  /* ── El papel ──────────────────────────────────────────────────────────── */
+  /* Mist White es la HOJA, no el fondo: las tarjetas cubren casi toda la
+     pantalla, así que ponerlo ahí es lo que lo hace predominante de verdad. El
+     suelo va un punto más hondo para que la hoja se despegue — con los dos
+     iguales hay que buscar el borde para saber dónde empieza cada sección. */
+  --papel:           #E7E6E0;   /* el suelo: mist rebajado */
+  --papel-halo:      #DDDCD5;   /* la sombra larga del fondo */
+  --hoja:            #F2F1EC;   /* Mist White: tarjetas y ventanas */
+  --hoja-2:          #E4E3DC;   /* campos, botones secundarios, casillas */
+  --raya:            #D5D4CC;   /* la línea del renglón */
+  --raya-fuerte:     #BEBDB5;
+
+  /* ── La tinta ──────────────────────────────────────────────────────────── */
+  --tinta:           #1E1E1E;   /* Basalt Black — 16,4:1 */
+  --tinta-2:         #4A4E52;   /* slate hondo — 7,7:1 */
+  --tinta-3:         #595E62;   /* slate medio — 4,8:1, es el mínimo */
+  --tinta-sobre-teal: #F2F1EC;  /* Mist White sobre el teal */
+
+  /* ── El timbre ─────────────────────────────────────────────────────────── */
+  /* Deep Teal. El único acento: margen, sellos, foco y acción primaria. */
+  --timbre:          #143D4A;
+  --timbre-claro:    #2E6377;   /* el mismo, gastado: filetes y bordes */
+  /* El extremo claro del degradado del anticipo. Es el TECHO: 4,76:1 con texto
+     blanco, y el siguiente paso (#40768C) ya cae a 4,43 y el nombre deja de
+     leerse justo en la cola de la barra, que es donde cae en las reservas de
+     dos noches. Para que se vea más pálido se estira el degradado —que llegue
+     antes a este tono— en vez de aclarar el tono. */
+  --timbre-lavado:   #3D7186;
+  --timbre-palido:   #DDE7EA;   /* la huella del sello sobre el papel */
+
+  /* ── Estados ───────────────────────────────────────────────────────────── */
+  /* No hay colores de estado propios: el libro se anota con una sola tinta y
+     un solo sello. Lo que dice "pagado" o "libre" es la palabra. El rojo queda
+     exclusivamente para destruir, que es lo único que merece otro color. */
+  --ok:              var(--timbre);
+  --alerta:          #6B5A2E;
+  --error:           #8C3A2E;
+
+  /* Sin disponibilidad: la línea tachada del libro. Apagada pero legible: el
+     nombre de la cabaña ocupada hay que poder leerlo. */
+  --ocupado:         #E8E7E1;
+  --ocupado-tx:      #5B5E59;
+  --parcial:         #E3EAEC;   /* quedan algunas */
+  --airbnb:          #A8615C;   /* marca ajena: identifica, no decora */
+
+  /* ── Tipografía ────────────────────────────────────────────────────────── */
+  /* Pila del sistema, que es lo correcto en una superficie de trabajo. El
+     carácter lo ponen las versalitas espaciadas y los renglones, no una fuente
+     display que en un teléfono con señal de montaña habría que descargar. */
+  --fuente:          system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --fuente-titulo:   system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --fuente-mono:     ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* ── Forma ─────────────────────────────────────────────────────────────── */
+  /* Cantos cortos: una hoja tiene cantos, no cápsulas. */
+  --radio:           6px;
+  --radio-chico:     4px;
+  --alto-raya:       28px;
+  /* Alto de una fila de la línea de tiempo. Con tres cabañas sobra sitio
+     vertical, así que la fila puede respirar: apretada a 40px las barras
+     quedaban como filetes y costaba apuntarles con el pulgar. */
+  --alto-fila-tl:    56px;
+  /* Aire a cada lado de una barra de la línea de tiempo: dos reservas seguidas
+     dejan el doble entre ellas. Subirlo separa más; pasado ~5px el punto de
+     encuentro deja de leerse en el medio del día. */
+  --aire-barra:      2.5px;
+  --sombra:          0 1px 0 rgba(30, 30, 30, .04),
+                     0 2px 10px rgba(30, 30, 30, .06);
+  --sombra-hoja:     0 -8px 30px rgba(30, 30, 30, .18);
+  --velo:            rgba(30, 30, 30, .36);
+  --vidrio:          blur(10px) saturate(112%);
+
+  /* ── Ritmo ─────────────────────────────────────────────────────────────── */
+  --e1: 4px;  --e2: 8px;  --e3: 12px;  --e4: 16px;
+  --e5: 24px; --e6: 32px; --e7: 48px;
+
+  --toque: 46px;
+}
