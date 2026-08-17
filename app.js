@@ -2539,7 +2539,7 @@ async function huCargar() {
   const [aloj, sol] = await Promise.all([
     api("bloqueos?select=id,cabana_id,nombre,telefono,desde,hasta,token,adultos,ninos"
         + `&tipo=eq.reserva&estado=eq.confirmada&desde=lte.${hoy}&hasta=gt.${hoy}&order=cabana_id`),
-    api("solicitudes?select=*&order=creado_at.desc&limit=120"),
+    api("solicitudes_con_foto?select=*&order=creado_at.desc&limit=120"),
   ]);
   hu.alojados = aloj || [];
   hu.solicitudes = sol || [];
@@ -2620,6 +2620,7 @@ async function pintarHuespedes() {
           </div>
           ${quien   ? `<div class="hu-sol-quien">${quien}</div>` : ""}
           ${detalle ? `<div class="hu-sol-detalle">${detalle}</div>` : ""}
+          ${x.tiene_foto ? `<button type="button" class="hu-sol-foto" data-foto="${x.id}">Ver la foto</button>` : ""}
         </div>
         ${x.estado === "resuelta"
           ? '<span class="hu-sol-ok">Listo</span>'
@@ -2631,7 +2632,14 @@ async function pintarHuespedes() {
                  <button type="button" class="hu-sol-si" data-tinaja-si="${x.id}">Aprobar</button>
                  <button type="button" class="hu-sol-no" data-tinaja-no="${x.id}">Rechazar</button>
                </div>`
-            : `<button type="button" class="hu-sol-btn" data-resolver="${x.id}">Marcar hecho</button>`}
+            /* Dos pasos y no uno: "en camino" le aparece al huesped en la app y
+               deja de preguntar si alguien lo vio. Ya vista, solo queda cerrar. */
+            : `<div class="hu-sol-tinaja">
+                 ${x.estado === "nueva"
+                   ? `<button type="button" class="hu-sol-no" data-encamino="${x.id}">En camino</button>`
+                   : ""}
+                 <button type="button" class="hu-sol-btn" data-resolver="${x.id}">Marcar hecho</button>
+               </div>`}
       </div>`;
   }).join("");
 }
@@ -2682,6 +2690,43 @@ async function huResolverTinaja(id, aprobar) {
       method: "POST",
       body: JSON.stringify({ p_solicitud: id, p_aprobar: aprobar }),
     });
+    pintarHuespedes();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+/* La foto se pide solo cuando Jose la quiere ver. Van en base64 y traerlas
+   todas de golpe en el listado seria arrastrar megas para pintar texto. */
+async function huVerFoto(id, boton) {
+  const caja = boton.parentElement;
+  const ya = caja.querySelector(".hu-foto-vista");
+  if (ya) { ya.remove(); boton.textContent = "Ver la foto"; return; }
+  boton.textContent = "Cargando\u2026";
+  try {
+    const r = await api(`solicitud_fotos?select=datos&solicitud_id=eq.${id}`);
+    const d = r && r[0] && r[0].datos;
+    if (!d) { boton.textContent = "No se pudo cargar"; return; }
+    const img = document.createElement("img");
+    img.className = "hu-foto-vista";
+    img.src = d;
+    img.alt = "Foto de la falla";
+    caja.appendChild(img);
+    boton.textContent = "Ocultar la foto";
+  } catch (e) {
+    boton.textContent = "No se pudo cargar";
+  }
+}
+
+/* "En camino": el huesped lo ve al momento en su app. */
+async function huEnCamino(id) {
+  try {
+    await api(`solicitudes?id=eq.${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ estado: "vista", visto_at: new Date().toISOString() }),
+    });
+    const s = hu.solicitudes.find((x) => x.id === id);
+    if (s) { s.estado = "vista"; }
     pintarHuespedes();
   } catch (e) {
     alert(e.message);
@@ -2768,6 +2813,10 @@ document.addEventListener("click", (e) => {
   if (tsi) { huResolverTinaja(tsi.dataset.tinajaSi, true); return; }
   const tno = e.target.closest("[data-tinaja-no]");
   if (tno) { huResolverTinaja(tno.dataset.tinajaNo, false); return; }
+  const enc = e.target.closest("[data-encamino]");
+  if (enc) { huEnCamino(enc.dataset.encamino); return; }
+  const fot = e.target.closest("[data-foto]");
+  if (fot) { huVerFoto(fot.dataset.foto, fot); return; }
   const res = e.target.closest("[data-resolver]");
   if (res) { huResolver(res.dataset.resolver); return; }
   const cha = e.target.closest("[data-chat]");
