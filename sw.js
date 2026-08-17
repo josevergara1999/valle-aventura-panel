@@ -54,3 +54,52 @@ self.addEventListener("fetch", (e) => {
     }
   })());
 });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Avisos al teléfono
+   ═══════════════════════════════════════════════════════════════════════════
+   Llegan cifrados desde la Edge Function `avisos`. El service worker es lo
+   único que sigue vivo con la app cerrada, así que es aquí donde se muestran. */
+
+self.addEventListener("push", (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { titulo: "Valle Aventura", cuerpo: "" }; }
+
+  const urgente = d.urgencia === "alta";
+
+  e.waitUntil(self.registration.showNotification(d.titulo || "Valle Aventura", {
+    body: d.cuerpo || "",
+    icon: "./icono-192.png",
+    badge: "./icono-192.png",
+    /* Agrupar por destino: tres pedidos seguidos de la misma cabaña actualizan
+       un aviso en vez de apilar tres. Los urgentes NO se agrupan — cada avería
+       merece su propia línea. */
+    tag: urgente ? undefined : (d.destino || "valle"),
+    renotify: urgente,
+    /* `requireInteraction` mantiene el aviso en pantalla hasta que se toca.
+       Solo para lo urgente: si se aplicara a todo, la pantalla de bloqueo
+       acabaría llena y dejaría de mirarse. */
+    requireInteraction: urgente,
+    vibrate: urgente ? [200, 80, 200] : [100],
+    data: { destino: d.destino || "calendario", id: d.id },
+  }));
+});
+
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const destino = (e.notification.data && e.notification.data.destino) || "calendario";
+  e.waitUntil((async () => {
+    const abiertas = await clients.matchAll({ type: "window", includeUncontrolled: true });
+    /* Si el panel ya está abierto se reutiliza esa ventana y se le dice a qué
+       pestaña ir. Abrir una segunda copia deja al usuario con dos paneles
+       desincronizados. */
+    for (const c of abiertas) {
+      if (c.url.includes(self.location.origin)) {
+        await c.focus();
+        c.postMessage({ tipo: "ir", destino });
+        return;
+      }
+    }
+    await clients.openWindow("./index.html#" + destino);
+  })());
+});

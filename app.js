@@ -2781,15 +2781,202 @@ document.addEventListener("click", (e) => {
   }
 });
 
+
+/* ============================================================================
+   Avisos al telefono
+   ============================================================================
+   El panel pide permiso, registra este dispositivo en la base y a partir de
+   ahi la Edge Function `avisos` le manda las notificaciones.
+
+   Cada dispositivo se registra por separado: Jose, su papa y Javiera reciben
+   los mismos avisos en sus propios telefonos sin pisarse. */
+
+const VAPID_PUBLICA = "BOOBabMlwesyBFQKK-PjtuoVwaceAeIWYbf6vfw7iLNsXExXQCVs8ASzw-xRcHdvBEB72DsevGsw27znNvk-cEY";
+
+/* La clave publica viaja como bytes, no como texto. */
+function claveABytes(base64) {
+  const relleno = "=".repeat((4 - (base64.length % 4)) % 4);
+  const limpia = (base64 + relleno).replace(/-/g, "+").replace(/_/g, "/");
+  const bin = atob(limpia);
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+}
+
+/* Un nombre reconocible para saber que telefono es cual en la base. */
+function nombreDispositivo() {
+  const ua = navigator.userAgent;
+  const so = /iPhone|iPad/.test(ua) ? "iPhone"
+           : /Android/.test(ua) ? "Android"
+           : /Mac/.test(ua) ? "Mac"
+           : /Windows/.test(ua) ? "Windows" : "Dispositivo";
+  const quien = (sesion && sesion.user && sesion.user.email || "").split("@")[0];
+  return quien ? so + " de " + quien : so;
+}
+
+async function avisosEstado() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return "no-soportado";
+  if (!window.isSecureContext) return "sin-https";
+  if (Notification.permission === "denied") return "bloqueado";
+  const reg = await navigator.serviceWorker.getRegistration();
+  const sub = reg && await reg.pushManager.getSubscription();
+  return sub ? "activo" : "inactivo";
+}
+
+async function avisosActivar() {
+  const estado = await avisosEstado();
+
+  if (estado === "no-soportado") {
+    alert("Este navegador no admite notificaciones."); return;
+  }
+  if (estado === "sin-https") {
+    alert("Las notificaciones necesitan https. Abre el panel en panel.valleaventura-chile.com."); return;
+  }
+  if (estado === "bloqueado") {
+    alert("Bloqueaste las notificaciones para este sitio. Hay que permitirlas en los ajustes del navegador."); return;
+  }
+
+  const permiso = await Notification.requestPermission();
+  if (permiso !== "granted") return;
+
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) {
+    sub = await reg.pushManager.subscribe({
+      // Obligatorio en todos los navegadores: no se puede recibir un push
+      // silencioso, siempre hay que mostrar algo. Nos viene bien.
+      userVisibleOnly: true,
+      applicationServerKey: claveABytes(VAPID_PUBLICA),
+    });
+  }
+
+  const j = sub.toJSON();
+  try {
+    /* `on_conflict` sobre el endpoint: si este telefono ya estaba registrado se
+       actualiza en vez de duplicarse. Reinstalar la app genera un endpoint
+       nuevo, asi que el viejo se desactiva solo al primer fallo de envio. */
+    await api("push_dispositivos?on_conflict=endpoint", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates" },
+      body: JSON.stringify({
+        endpoint: j.endpoint,
+        p256dh: j.keys.p256dh,
+        auth: j.keys.auth,
+        etiqueta: nombreDispositivo(),
+        activo: true,
+        fallos: 0,
+      }),
+    });
+    await pintarAvisos();
+    alert("Listo. Este telefono ya recibe los avisos.");
+  } catch (e) {
+    alert("No se pudo registrar: " + e.message);
+  }
+}
+
+async function avisosDesactivar() {
+  const reg = await navigator.serviceWorker.getRegistration();
+  const sub = reg && await reg.pushManager.getSubscription();
+  if (sub) {
+    try {
+      await api("push_dispositivos?endpoint=eq." + encodeURIComponent(sub.endpoint), {
+        method: "PATCH", body: JSON.stringify({ activo: false }),
+      });
+    } catch (e) { /* da igual: lo importante es cancelar del lado del navegador */ }
+    await sub.unsubscribe();
+  }
+  await pintarAvisos();
+}
+
+/* Que categorias quiere recibir. */
+async function avisosCategoria(cat, activa) {
+  try {
+    await api("avisos_config?categoria=eq." + cat, {
+      method: "PATCH", body: JSON.stringify({ activa }),
+    });
+  } catch (e) { alert("No se pudo guardar: " + e.message); }
+}
+
+const CATEGORIAS = [
+  { id: "huesped",   nombre: "Lo que pide el huesped", detalle: "Averias, pellet, tinaja y mensajes" },
+  { id: "reservas",  nombre: "Reservas",               detalle: "Nuevas, modificadas y canceladas" },
+  { id: "pagos",     nombre: "Pagos",                  detalle: "Abonos recibidos y rechazados" },
+  { id: "tinaja",    nombre: "Tinaja",                 detalle: "El dia antes y una hora antes" },
+  { id: "operacion", nombre: "El dia a dia",           detalle: "Llegadas, salidas, aseo y pellet" },
+  { id: "precios",   nombre: "Control",                detalle: "Cambios de precio y accesos" },
+];
+
+async function pintarAvisos() {
+  const caja = $("#vista-avisos");
+  if (!caja) return;
+
+  const estado = await avisosEstado();
+  let cfg = [];
+  try { cfg = await api("avisos_config?select=*"); } catch (e) { cfg = []; }
+
+  const explica = {
+    "no-soportado": "Este navegador no admite notificaciones.",
+    "sin-https":    "Abre el panel en panel.valleaventura-chile.com para poder activarlas.",
+    "bloqueado":    "Las bloqueaste para este sitio. Hay que permitirlas en los ajustes del navegador.",
+    "inactivo":     "Este telefono todavia no recibe avisos.",
+    "activo":       "Este telefono recibe los avisos.",
+  }[estado];
+
+  caja.innerHTML = `
+    <h2 class="titulo-seccion">Avisos a este telefono</h2>
+    <div class="av-estado ${estado}">
+      <div>
+        <b>${estado === "activo" ? "Activados" : "Desactivados"}</b>
+        <div class="av-sub">${explica}</div>
+      </div>
+      ${estado === "activo"
+        ? '<button type="button" class="secundario" id="av-off">Desactivar</button>'
+        : (estado === "inactivo"
+            ? '<button type="button" id="av-on">Activar</button>'
+            : "")}
+    </div>
+
+    <h2 class="titulo-seccion" style="margin-top:26px">Que quiero recibir</h2>
+    <div class="av-cats">
+      ${CATEGORIAS.map((c) => {
+        const f = cfg.find((x) => x.categoria === c.id);
+        const on = !f || f.activa;
+        return `
+          <label class="av-cat">
+            <span>
+              <b>${esc(c.nombre)}</b>
+              <span class="av-sub">${esc(c.detalle)}</span>
+            </span>
+            <input type="checkbox" data-cat="${c.id}" ${on ? "checked" : ""}>
+          </label>`;
+      }).join("")}
+    </div>
+    <p class="av-nota">No hay horario de silencio: todos los avisos llegan cuando ocurren.</p>`;
+
+  const on = $("#av-on"); if (on) on.addEventListener("click", avisosActivar);
+  const off = $("#av-off"); if (off) off.addEventListener("click", avisosDesactivar);
+  caja.querySelectorAll("[data-cat]").forEach((i) =>
+    i.addEventListener("change", () => avisosCategoria(i.dataset.cat, i.checked)));
+}
+
+/* El service worker avisa a que pestania ir cuando se toca una notificacion. */
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("message", (e) => {
+    if (e.data && e.data.tipo === "ir") {
+      const b = document.querySelector(`nav.tabs button[data-vista="${e.data.destino}"]`);
+      if (b) b.click();
+    }
+  });
+}
+
 /* -------------------------------------------------------------- Pestanas -- */
 document.querySelectorAll("nav.tabs button").forEach((b) => {
   b.addEventListener("click", () => {
     document.querySelectorAll("nav.tabs button")
       .forEach((x) => x.setAttribute("aria-selected", String(x === b)));
-    ["calendario", "huespedes", "aseos", "finanzas", "tarifas"].forEach((v) => {
+    ["calendario", "huespedes", "aseos", "finanzas", "tarifas", "avisos"].forEach((v) => {
       $(`#vista-${v}`).hidden = v !== b.dataset.vista;
     });
     if (b.dataset.vista === "huespedes") pintarHuespedes();
+    if (b.dataset.vista === "avisos")    pintarAvisos();
     if (b.dataset.vista === "tarifas")  pintarTarifas();
     if (b.dataset.vista === "aseos")    pintarAseos();
     if (b.dataset.vista === "finanzas") pintarFinanzas();

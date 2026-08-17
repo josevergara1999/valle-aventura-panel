@@ -153,6 +153,11 @@ finish review, the verdict, and DESIGN.md
       <div id="hu-solicitudes" class="hu-lista"></div>
     </section>
 
+    <!-- Ajustes de notificaciones. Vive aqui y no en un menu escondido porque
+         es lo primero que hay que hacer al instalar el panel en un telefono
+         nuevo, y porque apagar una categoria tiene que ser facil. -->
+    <section id="vista-avisos" hidden></section>
+
     <section id="vista-aseos" hidden>
       <h2 class="titulo-seccion">Aseos · próximos 30 días</h2>
       <div class="tarjeta"><div id="tl-aseos"></div></div>
@@ -341,6 +346,7 @@ finish review, the verdict, and DESIGN.md
     <button type="button" role="tab" data-vista="aseos"      aria-selected="false">Aseos</button>
     <button type="button" role="tab" data-vista="finanzas"   aria-selected="false">Finanzas</button>
     <button type="button" role="tab" data-vista="tarifas"    aria-selected="false">Precios</button>
+    <button type="button" role="tab" data-vista="avisos"     aria-selected="false">Avisos</button>
   </nav>
 </div>
 
