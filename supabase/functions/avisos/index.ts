@@ -18,11 +18,30 @@
  * pueden leer que la cabaña Nevados se quedó sin agua caliente.
  *
  * DESPLIEGUE
+ *   supabase secrets set VA_SERVICE_KEY=sb_secret_...
  *   supabase secrets set VAPID_PUBLIC=... VAPID_PRIVATE=... VAPID_SUBJECT=mailto:...
  */
 
 const SB_URL  = Deno.env.get('SUPABASE_URL') ?? '';
-const SB_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+/* POR QUE NO SE USA SOLO SUPABASE_SERVICE_ROLE_KEY
+ * -----------------------------------------------
+ * Este proyecto usa el sistema nuevo de claves (sb_publishable_ / sb_secret_).
+ * En esos proyectos SUPABASE_SERVICE_ROLE_KEY llega vacia, porque pertenece al
+ * sistema antiguo de claves JWT. Y como Supabase reserva el prefijo SUPABASE_,
+ * tampoco se puede definir a mano.
+ *
+ * El resultado era silencioso y por eso costo verlo: sin clave, las lecturas a
+ * la base devolvian 401, la respuesta no era un array, y la funcion salia por
+ * el atajo de "no hay ningun telefono suscrito" con dispositivos: 0. Tres
+ * iPhone registrados y activos, y ni un aviso enviado nunca.
+ *
+ * Se lee VA_SERVICE_KEY, que si se puede definir, y se deja la antigua como
+ * respaldo por si algun dia se reactivan las claves JWT.
+ */
+const SB_KEY  = Deno.env.get('VA_SERVICE_KEY')
+             ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+             ?? '';
 const VAPID_PUB  = Deno.env.get('VAPID_PUBLIC') ?? '';
 const VAPID_PRIV = Deno.env.get('VAPID_PRIVATE') ?? '';
 const SUBJECT    = Deno.env.get('VAPID_SUBJECT') ?? 'mailto:reservasvalleaventura@gmail.com';
@@ -160,6 +179,15 @@ const api = (ruta: string, opts: RequestInit = {}) =>
 Deno.serve(async (req) => {
   if (!VAPID_PUB || !VAPID_PRIV) {
     return new Response(JSON.stringify({ error: 'Faltan las claves VAPID' }), { status: 503 });
+  }
+  /* Sin clave de servicio no se puede leer nada, y callarselo fue justo lo que
+     hizo que el fallo pasara desapercibido: la funcion respondia 200 con
+     dispositivos: 0, indistinguible de "nadie se ha suscrito todavia". */
+  if (!SB_KEY) {
+    return new Response(JSON.stringify({
+      error: 'Falta VA_SERVICE_KEY',
+      comoArreglarlo: 'supabase secrets set VA_SERVICE_KEY=sb_secret_...',
+    }), { status: 503, headers: { 'Content-Type': 'application/json' } });
   }
 
   // Primero los recordatorios calculados (tinaja de mañana, check-out…)
