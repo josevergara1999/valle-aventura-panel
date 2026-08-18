@@ -2783,10 +2783,15 @@ async function huConfirmarReserva(id) {
     l.push("", `Abono recibido: ${clp(abonado)}`);
   }
 
+  /* Corto a proposito. Aqui el cliente solo necesita saber que va a recibir
+     algo y cuando; el detalle de para que sirve la app va en el mensaje que
+     lleva el enlace, cuando ya lo puede abrir. Explicarlo dos veces hace que no
+     se lea ninguna.
+
+     Y en una sola linea: WhatsApp ajusta solo, y partir la frase a mano deja el
+     texto en escalera en cuanto cambia el ancho de la pantalla. */
   l.push("",
-    "El día antes de tu llegada te enviamos por aquí el acceso a nuestra app,",
-    "donde vas a encontrar qué hacer en el valle y desde donde puedes pedirnos",
-    "pellet, reservar la tinaja o avisarnos si algo falla.",
+    "El día antes de tu llegada te enviamos por aquí el acceso a nuestra app, con toda la información de tu estadía.",
     "",
     "Cualquier cosa, escríbenos por aquí. ¡Te esperamos!");
 
