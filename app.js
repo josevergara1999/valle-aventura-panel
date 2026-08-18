@@ -580,6 +580,20 @@ function pintarListaAseos() {
    ventana el gráfico mentiría en todos los meses salvo tres.
    Las filas se releen SIEMPRE (un pago nuevo tiene que verse al instante); lo
    que se cachea es la cotización, que es la parte cara. */
+/* La clave de `st.cotiz`. Vive aqui fuera y no dentro de `totalesDelAnio`
+   porque la usan dos sitios: el que llena la cache y el que la lee. Con una
+   copia en cada lado, cambiar los campos en uno solo dejaria de encontrar las
+   cotizaciones sin dar ningun error: los totales apareceran en cero. */
+const claveCotiz = (b) =>
+  [b.id, b.cabana_id, b.desde, b.hasta, b.adultos, b.ninos, b.tinaja].join("|");
+
+/* Lo efectivamente cobrado de una reserva. Un monto sin su fecha NO cuenta:
+   `pago1_monto` puede estar escrito mientras `pago1_at` sigue vacio —el panel
+   deja anotar el monto antes de marcarlo pagado— y sumarlo diria que entro
+   plata que nadie ha visto. */
+const pagado = (b) =>
+  (b.pago1_at ? b.pago1_monto || 0 : 0) + (b.pago2_at ? b.pago2_monto || 0 : 0);
+
 async function totalesDelAnio(anio) {
   const filtro = st.cabanaSel === TODAS
     ? "" : `&cabana_id=eq.${encodeURIComponent(st.cabanaSel)}`;
@@ -587,20 +601,17 @@ async function totalesDelAnio(anio) {
     "bloqueos?select=" + COLUMNAS + filtro +
     `&tipo=neq.bloqueo&desde=gte.${anio}-01-01&desde=lte.${anio}-12-31&order=desde`);
 
-  const clave = (b) =>
-    [b.id, b.cabana_id, b.desde, b.hasta, b.adultos, b.ninos, b.tinaja].join("|");
-
   /* De a seis, no las cien de golpe: cotizar es una llamada por reserva y un
      teléfono con datos móviles no aguanta esa avalancha. */
-  const faltan = reservas.filter((b) => !st.cotiz.has(clave(b)));
+  const faltan = reservas.filter((b) => !st.cotiz.has(claveCotiz(b)));
   for (let i = 0; i < faltan.length; i += 6) {
     await Promise.all(faltan.slice(i, i + 6).map(async (b) => {
       try {
         const c = await api("rpc/cotizar", { method: "POST", body: JSON.stringify({
           p_cabana: b.cabana_id, p_entrada: b.desde, p_salida: b.hasta,
           p_adultos: b.adultos || 1, p_ninos: b.ninos || 0, p_tinaja: !!b.tinaja })});
-        st.cotiz.set(clave(b), c?.ok ? c.total : null);
-      } catch { st.cotiz.set(clave(b), null); }
+        st.cotiz.set(claveCotiz(b), c?.ok ? c.total : null);
+      } catch { st.cotiz.set(claveCotiz(b), null); }
     }));
   }
 
@@ -608,7 +619,7 @@ async function totalesDelAnio(anio) {
     ({ total: 0, cobrado: 0, pendiente: 0, reservas: 0, sinCotizar: 0 }));
   for (const b of reservas) {
     const m = meses[+b.desde.slice(5, 7) - 1];
-    const t = st.cotiz.get(clave(b));
+    const t = st.cotiz.get(claveCotiz(b));
     m.reservas++;
     if (t == null) { m.sinCotizar++; continue; }   // sin precio no suma: mejor faltar que mentir
     m.total   += t;
@@ -785,7 +796,21 @@ async function pintarFinanzas() {
 
   /* Por canal: cuantas y cuanta plata. El conteo es el dato por el que existe
      todo esto —saber que anuncio trae clientes— y el monto es el que dice si
-     ese canal ademas trae los buenos. */
+     ese canal ademas trae los buenos.
+
+     ESTO NO SE VEIA NUNCA. `conTotal` se usaba sin haberlo declarado en ningun
+     sitio, asi que la funcion reventaba con un ReferenceError justo aqui: el
+     pellet y la tinaja alcanzaban a pintarse —van antes— y el bloque de canales
+     se quedaba en blanco para siempre. Un bloque vacio no se distingue de uno
+     que no tiene datos, y por eso el fallo aguanto sin que nadie lo mirara.
+
+     El total sale de `st.cotiz`, la cache que llena el grafico anual unas
+     lineas mas arriba. Las que no tengan cotizacion se quedan fuera en vez de
+     contarse como cero: una reserva sin precio no es una reserva gratis. */
+  const conTotal = reservas
+    .map((b) => ({ b, total: st.cotiz.get(claveCotiz(b)) }))
+    .filter((x) => x.total != null);
+
   const porCanal = {};
   for (const x of conTotal) {
     const k = x.b.canal || (x.b.origen === "airbnb" ? "airbnb" : "otro");
@@ -796,6 +821,13 @@ async function pintarFinanzas() {
   }
 
   const orden = ["web", "whatsapp", "instagram", "airbnb", "directo", "otro"];
+  if (!conTotal.length) {
+    $("#canales-finanzas").innerHTML = reservas.length
+      ? '<p class="lista-vacia">No se pudieron cotizar las reservas del mes. Reintenta en un momento.</p>'
+      : `<p class="lista-vacia">Ninguna reserva en ${mesCorto}.</p>`;
+    return;
+  }
+
   $("#canales-finanzas").innerHTML = orden
     .filter((k) => porCanal[k])
     .map((k) => {
@@ -2553,7 +2585,7 @@ const HU_FALLA = {
   luz: "Luz", agua: "Agua", wifi: "WiFi",
 };
 
-const hu = { filtro: "pendientes", solicitudes: [], alojados: [], chat: null };
+const hu = { filtro: "pendientes", solicitudes: [], alojados: [], porLlegar: [], chat: null };
 
 /* Cuanto hace que llego, en palabras. "hace 4 h" dice mas de un vistazo que
    una hora exacta cuando lo que importa es si lleva esperando mucho. */
@@ -2569,12 +2601,23 @@ function huHace(iso) {
 
 async function huCargar() {
   const hoy = hoyISO();
-  const [aloj, sol] = await Promise.all([
-    api("bloqueos?select=id,cabana_id,nombre,telefono,desde,hasta,token,adultos,ninos"
+  /* `pago1_at` y los montos hacen falta para poder decirle al huesped cuanto
+     abono y cuanto le queda. Sin la fecha no se cuenta como pagado: el monto
+     puede estar anotado antes de marcarlo. */
+  const CAMPOS = "id,cabana_id,nombre,telefono,desde,hasta,token,adultos,ninos,tinaja,"
+               + "pago1_at,pago1_monto,pago2_at,pago2_monto";
+  /* Los que llegan en los proximos 30 dias. Mas alla no sirve de nada tenerlos
+     delante todos los dias. */
+  const tope = sumarDias(hoy, 30);
+  const [aloj, porLlegar, sol] = await Promise.all([
+    api(`bloqueos?select=${CAMPOS}`
         + `&tipo=eq.reserva&estado=eq.confirmada&desde=lte.${hoy}&hasta=gt.${hoy}&order=cabana_id`),
+    api(`bloqueos?select=${CAMPOS}`
+        + `&tipo=eq.reserva&estado=eq.confirmada&desde=gt.${hoy}&desde=lte.${tope}&order=desde`),
     api("solicitudes_con_foto?select=*&order=creado_at.desc&limit=120"),
   ]);
   hu.alojados = aloj || [];
+  hu.porLlegar = porLlegar || [];
   hu.solicitudes = sol || [];
   huBadge();
 }
@@ -2591,33 +2634,46 @@ function huBadge() {
 async function pintarHuespedes() {
   await huCargar();
 
-  /* ── Alojados ahora ── */
+  /* ── Alojados ahora y Llegan pronto ──
+     Misma tarjeta para los dos, porque es el mismo huesped en dos momentos.
+     Cambia el subtitulo —uno sale, el otro llega— y que el enlace de la app
+     solo se ofrece a quien ya esta dentro: mandarlo tres semanas antes es
+     regalar un enlace que va a estar perdido en el chat cuando haga falta. */
+  const tarjeta = (b, yaLlego) => {
+    const cab = st.cabanas.find((c) => c.id === b.cabana_id);
+    return `
+      <div class="hu-card" data-huesped="${b.id}">
+        <div class="hu-card-top">
+          <div>
+            <b>${esc(b.nombre || "Sin nombre")}</b>
+            <div class="hu-card-sub">${esc(cab ? cab.nombre : b.cabana_id)}
+              &middot; ${yaLlego ? "sale " + fechaCorta(b.hasta) : "llega " + fechaCorta(b.desde)}</div>
+          </div>
+          ${yaLlego
+            ? `<span class="hu-pill ${b.token ? "ok" : ""}">${b.token ? "app enviada" : "sin app"}</span>`
+            : `<span class="hu-pill">${nochesEntre(b.desde, b.hasta)} noche${nochesEntre(b.desde, b.hasta) === 1 ? "" : "s"}</span>`}
+        </div>
+        <div class="hu-card-acciones">
+          <button type="button" class="hu-btn-confirmar" data-confirmar="${b.id}">
+            Confirmar reserva
+          </button>
+          ${yaLlego ? `<button type="button" class="hu-btn-wa" data-enviar="${b.id}">
+            Enviar app por WhatsApp
+          </button>` : ""}
+          <button type="button" class="hu-btn-chat" data-chat="${b.id}">Mensajes</button>
+        </div>
+      </div>`;
+  };
+
   const caja = $("#hu-alojados");
-  if (!hu.alojados.length) {
-    caja.innerHTML = '<p class="lista-vacia">No hay nadie alojado hoy.</p>';
-  } else {
-    caja.innerHTML = hu.alojados.map((b) => {
-      const cab = st.cabanas.find((c) => c.id === b.cabana_id);
-      const sinLeer = 0; // se rellena abajo, tras consultar mensajes
-      return `
-        <div class="hu-card" data-huesped="${b.id}">
-          <div class="hu-card-top">
-            <div>
-              <b>${esc(b.nombre || "Sin nombre")}</b>
-              <div class="hu-card-sub">${esc(cab ? cab.nombre : b.cabana_id)}
-                &middot; sale ${fechaCorta(b.hasta)}</div>
-            </div>
-            <span class="hu-pill ${b.token ? "ok" : ""}">${b.token ? "app enviada" : "sin app"}</span>
-          </div>
-          <div class="hu-card-acciones">
-            <button type="button" class="hu-btn-wa" data-enviar="${b.id}">
-              Enviar app por WhatsApp
-            </button>
-            <button type="button" class="hu-btn-chat" data-chat="${b.id}">Mensajes</button>
-          </div>
-        </div>`;
-    }).join("");
-  }
+  caja.innerHTML = hu.alojados.length
+    ? hu.alojados.map((b) => tarjeta(b, true)).join("")
+    : '<p class="lista-vacia">No hay nadie alojado hoy.</p>';
+
+  const cajaLlegan = $("#hu-porllegar");
+  cajaLlegan.innerHTML = hu.porLlegar.length
+    ? hu.porLlegar.map((b) => tarjeta(b, false)).join("")
+    : '<p class="lista-vacia">Nadie llega en los proximos 30 dias.</p>';
 
   /* ── Solicitudes ── */
   const lista = hu.filtro === "pendientes"
@@ -2679,6 +2735,66 @@ async function pintarHuespedes() {
 
 /* Genera (o recupera) el enlace y abre WhatsApp con el mensaje escrito.
    No se manda solo: se abre WhatsApp para que Jose lo revise y lo envie. */
+/* El mensaje de confirmacion. Lo pide Jose para mandarlo apenas entra una
+   reserva: el cliente acaba de pagar por internet a un desconocido y lo que
+   calma esa duda no es un correo automatico, es una persona escribiendo.
+
+   El total lo calcula `cotizar()`, no el panel: es la misma funcion que cobro,
+   asi que el numero del mensaje es exactamente el que se le prometio. Si
+   fallara, se manda igual sin las cifras — un mensaje sin montos sirve; uno con
+   montos inventados, no. */
+async function huConfirmarReserva(id) {
+  const b = [...hu.alojados, ...hu.porLlegar].find((x) => x.id === id);
+  if (!b) return;
+  if (!b.telefono) { alert("Esa reserva no tiene telefono guardado."); return; }
+
+  const cab = st.cabanas.find((c) => c.id === b.cabana_id);
+  const nombre = (b.nombre || "").split(" ")[0];
+  const noches = nochesEntre(b.desde, b.hasta);
+  const abonado = pagado(b);
+
+  let c = null;
+  try {
+    c = await api("rpc/cotizar", { method: "POST", body: JSON.stringify({
+      p_cabana: b.cabana_id, p_entrada: b.desde, p_salida: b.hasta,
+      p_adultos: b.adultos || 1, p_ninos: b.ninos || 0, p_tinaja: !!b.tinaja })});
+  } catch { /* se manda sin cifras */ }
+
+  const personas = [
+    `${b.adultos || 1} adulto${(b.adultos || 1) === 1 ? "" : "s"}`,
+    b.ninos ? `${b.ninos} niño${b.ninos === 1 ? "" : "s"}` : null,
+  ].filter(Boolean).join(" y ");
+
+  const l = [
+    `¡Hola ${nombre}! Te habla el equipo de Valle Aventura para confirmar tu reserva.`,
+    "",
+    `${cab ? cab.nombre : "Cabaña"}`,
+    `Llegada: ${fechaCorta(b.desde)}${c?.check_in ? " desde las " + hhmm(c.check_in) : ""}`,
+    `Salida: ${fechaCorta(b.hasta)}${c?.check_out ? " hasta las " + hhmm(c.check_out) : ""}`,
+    `${noches} noche${noches === 1 ? "" : "s"} · ${personas}`,
+  ];
+
+  if (c?.ok) {
+    const falta = Math.max(0, c.total - abonado);
+    l.push("", `Total: ${clp(c.total)}`,
+           `Abono recibido: ${clp(abonado)}`,
+           `Queda por pagar al llegar: ${clp(falta)}`);
+  } else if (abonado) {
+    l.push("", `Abono recibido: ${clp(abonado)}`);
+  }
+
+  l.push("",
+    "El día antes de tu llegada te enviamos por aquí el acceso a nuestra app,",
+    "donde vas a encontrar qué hacer en el valle y desde donde puedes pedirnos",
+    "pellet, reservar la tinaja o avisarnos si algo falla.",
+    "",
+    "Cualquier cosa, escríbenos por aquí. ¡Te esperamos!");
+
+  const texto = l.join("\n");
+  const fono = String(b.telefono).replace(/[^0-9]/g, "");
+  window.open(`https://wa.me/${fono}?text=${encodeURIComponent(texto)}`, "_blank");
+}
+
 async function huEnviarApp(id) {
   const b = hu.alojados.find((a) => a.id === id);
   if (!b) return;
@@ -2694,14 +2810,14 @@ async function huEnviarApp(id) {
     const cab = st.cabanas.find((c) => c.id === b.cabana_id);
     const nombre = (b.nombre || "").split(" ")[0];
     const texto = [
-      `Hola ${nombre}! Te dejo el acceso a nuestra app de bienvenida.`,
+      `¡Hola ${nombre}! Te dejo el acceso a nuestra app de bienvenida.`,
       "",
-      `Ahi encuentras que hacer en el valle, los senderos, donde comer,`,
+      `Ahí encuentras qué hacer en el valle, los senderos, dónde comer,`,
       `y puedes pedirnos pellet, reservar la tinaja o avisarnos si algo falla.`,
       "",
       `${HU_APP_URL}/?r=${token}`,
       "",
-      `Es tu enlace personal para ${cab ? cab.nombre : "tu cabana"}. Cualquier cosa, escribenos por ahi.`,
+      `Es tu enlace personal para ${cab ? cab.nombre : "tu cabaña"}. Cualquier cosa, escríbenos por ahí.`,
     ].join("\n");
 
     // Solo digitos: wa.me rechaza el + y los espacios.
@@ -2840,6 +2956,9 @@ async function huPintarChat() {
 
 /* ── Eventos de la vista ── */
 document.addEventListener("click", (e) => {
+  const conf = e.target.closest("[data-confirmar]");
+  if (conf) { huConfirmarReserva(conf.dataset.confirmar); return; }
+
   const env = e.target.closest("[data-enviar]");
   if (env) { huEnviarApp(env.dataset.enviar); return; }
   const tsi = e.target.closest("[data-tinaja-si]");

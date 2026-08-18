@@ -1036,16 +1036,24 @@ nav.tabs button[aria-selected="true"] { color: var(--timbre); box-shadow: inset 
 .hu-pill.ok { background: var(--timbre-palido); color: var(--timbre); }
 
 .hu-card-acciones { display: flex; gap: 8px; margin-top: 12px; }
-.hu-btn-wa, .hu-btn-chat {
+/* Tres botones no caben en una fila de telefono sin quedar en dos palabras
+   cortadas cada uno. Envuelven, y el de confirmar ocupa la fila entera: es el
+   que se usa una vez por reserva y el primero que se busca. */
+.hu-card-acciones { flex-wrap: wrap; }
+.hu-btn-wa, .hu-btn-chat, .hu-btn-confirmar {
   flex: 1; min-height: var(--toque);
   border-radius: 999px; border: 1px solid var(--raya);
   font-family: var(--fuente); font-size: 12.5px; font-weight: 600;
   cursor: pointer;
   transition: transform 0.12s, background 0.18s;
 }
+.hu-btn-confirmar {
+  flex-basis: 100%;
+  background: var(--timbre); border-color: var(--timbre); color: #fff;
+}
 .hu-btn-wa   { background: #25d366; border-color: #25d366; color: #0b2b16; }
 .hu-btn-chat { background: var(--hoja-2); color: var(--tinta); }
-.hu-btn-wa:active, .hu-btn-chat:active { transform: scale(0.97); }
+.hu-btn-wa:active, .hu-btn-chat:active, .hu-btn-confirmar:active { transform: scale(0.97); }
 
 /* -- Solicitudes -- */
 .hu-filtros { display: flex; gap: 7px; margin-bottom: 12px; }
