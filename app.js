@@ -700,23 +700,34 @@ async function pintarFinanzas() {
   const fin = iso(st.anio, st.mes, new Date(st.anio, st.mes + 1, 0).getDate());
   const mes = new Date(st.anio, st.mes, 1).toLocaleDateString("es-CL", { month: "long", year: "numeric" });
   const mesTitulo = mes.charAt(0).toUpperCase() + mes.slice(1);
+  /* "agosto de 2026" -> "agosto 2026": cabe en un titulo de telefono. */
+  const mesCorto = mes.replace(" de ", " ");
   $("#titulo-finanzas").textContent = "Resumen";
+
+  /* CADA seccion dice de QUE MES habla. Antes ponia "este mes" a secas, y
+     estar en el mes equivocado se veia exactamente igual que haber perdido el
+     dato: Jose anoto una entrega de pellet, la vio guardada, y al volver le
+     parecio que se habia borrado — estaba mirando otro mes. Un titulo que no
+     se puede contrastar con nada es un titulo que miente a medias. */
+  $("#titulo-pellet-mes").textContent = `Pellet por cabaña · ${mesCorto}`;
+  $("#titulo-canales").textContent    = `Por dónde entró · ${mesCorto}`;
+  $("#titulo-tinaja").textContent     = `Tinaja · ${mesCorto}`;
 
   const reservas = st.bloqueos.filter((b) =>
     b.tipo !== "bloqueo" && b.desde >= ini && b.desde <= fin);
 
   /* El pellet no depende de que haya reservas: la casa consume igual. */
   if (!st.pellet.length && !st.lugares.length) await cargarPellet().catch(() => {});
-  pintarPellet(ini, fin);
+  pintarPellet(ini, fin, mesCorto);
 
   $("#tinaja-finanzas").innerHTML  = reservas.length
     ? '<p class="lista-vacia">Calculando...</p>'
-    : '<p class="lista-vacia">Ningún turno de tinaja este mes.</p>';
+    : `<p class="lista-vacia">Ningún turno de tinaja en ${mesCorto}.</p>`;
   /* Un bloque en blanco no se distingue de uno roto. Si el mes no tiene
      reservas hay que decirlo, que es un dato, no una averia. */
   if (!reservas.length) {
     $("#canales-finanzas").innerHTML =
-      '<p class="lista-vacia">Ninguna reserva este mes.</p>';
+      `<p class="lista-vacia">Ninguna reserva en ${mesCorto}.</p>`;
   }
 
   /* El gráfico se dibuja aunque el mes esté vacío: un mes sin reservas es un
@@ -770,7 +781,7 @@ async function pintarFinanzas() {
            <span>${esc(nombreCabana(b.cabana_id))}</span>
          </div>`).join("")}
        </div>`
-    : '<p class="lista-vacia">Ningún turno de tinaja este mes.</p>';
+    : `<p class="lista-vacia">Ningún turno de tinaja en ${mesCorto}.</p>`;
 
   /* Por canal: cuantas y cuanta plata. El conteo es el dato por el que existe
      todo esto —saber que anuncio trae clientes— y el monto es el que dice si
@@ -976,7 +987,7 @@ function stockPellet() {
 
 const nombreLugar = (id) => st.lugares.find((l) => l.id === id)?.nombre || id;
 
-function pintarPellet(ini, fin) {
+function pintarPellet(ini, fin, mesCorto) {
   const { stock, contado } = stockPellet();
   const cap = st.reglas?.sacos_por_pallet ?? 70;
   const precio = st.reglas?.precio_saco_pellet ?? 0;
@@ -996,7 +1007,8 @@ function pintarPellet(ini, fin) {
     m.tipo === "entrega" && m.fecha >= ini && m.fecha <= fin);
 
   if (!delMes.length) {
-    $("#pellet-cabanas").innerHTML = '<p class="lista-vacia">Sin entregas este mes.</p>';
+    $("#pellet-cabanas").innerHTML =
+      `<p class="lista-vacia">Sin entregas en ${mesCorto || "este mes"}.</p>`;
     return;
   }
 
