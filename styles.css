@@ -602,6 +602,9 @@ button.mas span { font-size: 18px; font-weight: 700; line-height: 1; margin-top:
 .insignia.instagram { background: linear-gradient(45deg, #F9CE34, #EE2A7B 55%, #6228D7); }
 .insignia.airbnb    { background: #FF5A5F; }
 .insignia.directo   { background: var(--timbre); }
+/* El azul de Mercado Pago, que es por donde llegan hoy todas las de la web:
+   se reconoce de un vistazo entre las demas insignias sin tener que leerla. */
+.insignia.web       { background: #00A5E5; }
 .insignia.otro      { background: var(--tinta-3); }
 
 /* Reserva que entro por la web y todavia no esta pagada. Ambar, no rojo: no

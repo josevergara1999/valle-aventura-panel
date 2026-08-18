@@ -185,6 +185,9 @@ const ICONO = {
   instagram: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="1.2" fill="#fff" stroke="none"/></svg>',
   airbnb: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c-1 0-1.6.7-2.1 1.7C8.3 7.6 5 14 4 16.6c-.5 1.3.4 2.6 1.8 2.6 1.4 0 2.9-1 3.9-2.2l2.3-2.8 2.3 2.8c1 1.2 2.5 2.2 3.9 2.2 1.4 0 2.3-1.3 1.8-2.6C19 14 15.7 7.6 14.1 4.7 13.6 3.7 13 3 12 3z"/></svg>',
   directo: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>',
+  /* Un globo y no un carrito ni una tarjeta: el canal es "entro por la pagina",
+     no "pago con tarjeta". El medio de pago es otro eje. */
+  web: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3.2 9.5h17.6M3.2 14.5h17.6"/><path d="M12 3a14 14 0 000 18 14 14 0 000-18z"/></svg>',
   otro: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 113.2 2.4c-.5.2-.7.6-.7 1.1v.5"/><circle cx="12" cy="17" r=".6" fill="#fff"/></svg>',
 };
 /* Escoba, dibujada aqui y no traida de una libreria de iconos: es un solo trazo
@@ -196,12 +199,25 @@ const ESCOBA = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
   '<path d="M8 17v4.5M12 17v4.5M16 17v4.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/>' +
   '</svg>';
 
+/* `web` es el que reserva y PAGA solo, sin que nadie conteste nada. La base ya
+   lo guardaba —`solicitar_reserva` escribe canal='web'— pero no estaba en esta
+   lista, y como el bloque de canales filtra por ella, esas reservas
+   desaparecian del panel sin dejar rastro: ni en "Otro" salian. Justo el canal
+   que mas interesa vigilar era el unico invisible. */
 const CANALES = [
+  { id: "web",       nombre: "Web" },
   { id: "whatsapp",  nombre: "WhatsApp" },
   { id: "instagram", nombre: "Instagram" },
   { id: "airbnb",    nombre: "Airbnb" },
   { id: "directo",   nombre: "Directo" },
 ];
+/* Los que se pueden marcar a mano al anotar una reserva. `web` queda fuera a
+   proposito: lo escribe `solicitar_reserva` cuando el cliente reserva y paga
+   solo desde la pagina. Si se pudiera elegir a mano, alguien acabaria marcando
+   "Web" una reserva que entro por telefono, y el canal dejaria de servir para
+   lo unico para lo que existe: saber que trae clientes de verdad. */
+const CANALES_A_MANO = CANALES.filter((c) => c.id !== "web");
+
 const insignia = (canal) => canal
   ? `<span class="insignia ${canal}" title="${canal}">${ICONO[canal] || ICONO.otro}</span>` : "";
 
@@ -696,7 +712,12 @@ async function pintarFinanzas() {
   $("#tinaja-finanzas").innerHTML  = reservas.length
     ? '<p class="lista-vacia">Calculando...</p>'
     : '<p class="lista-vacia">Ningún turno de tinaja este mes.</p>';
-  if (!reservas.length) $("#canales-finanzas").innerHTML = "";
+  /* Un bloque en blanco no se distingue de uno roto. Si el mes no tiene
+     reservas hay que decirlo, que es un dato, no una averia. */
+  if (!reservas.length) {
+    $("#canales-finanzas").innerHTML =
+      '<p class="lista-vacia">Ninguna reserva este mes.</p>';
+  }
 
   /* El gráfico se dibuja aunque el mes esté vacío: un mes sin reservas es un
      dato, y verlo al lado de los llenos es justamente para lo que sirve. */
@@ -763,7 +784,7 @@ async function pintarFinanzas() {
     porCanal[k].cobrado += pagado(x.b);
   }
 
-  const orden = ["whatsapp", "instagram", "airbnb", "directo", "otro"];
+  const orden = ["web", "whatsapp", "instagram", "airbnb", "directo", "otro"];
   $("#canales-finanzas").innerHTML = orden
     .filter((k) => porCanal[k])
     .map((k) => {
@@ -1684,7 +1705,7 @@ function cuerpoPaso(n, cab) {
     </div>
     <label>¿Por dónde llegó?</label>
     <div class="canales" id="res-canales">
-      ${CANALES.map((c) => `<button type="button" class="canal" data-canal="${c.id}"
+      ${CANALES_A_MANO.map((c) => `<button type="button" class="canal" data-canal="${c.id}"
           aria-pressed="${String(c.id === d.canal)}">${insignia(c.id)}<span>${c.nombre}</span></button>`).join("")}
     </div>
     <div class="fila" style="margin-top:var(--e4)">
@@ -2039,7 +2060,7 @@ function editarReserva(id) {
     </div>
     <label>Por donde llego?</label>
     <div class="canales" id="ed-canales">
-      ${CANALES.map((c) => `<button type="button" class="canal" data-canal="${c.id}"
+      ${(st.canal === "web" ? CANALES : CANALES_A_MANO).map((c) => `<button type="button" class="canal" data-canal="${c.id}"
           aria-pressed="${String(c.id === st.canal)}">${insignia(c.id)}<span>${c.nombre}</span></button>`).join("")}
     </div>`}
     <div class="campo" style="margin-top:var(--e3)">
