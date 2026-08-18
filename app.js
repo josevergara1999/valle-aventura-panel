@@ -2605,7 +2605,7 @@ async function huCargar() {
      abono y cuanto le queda. Sin la fecha no se cuenta como pagado: el monto
      puede estar anotado antes de marcarlo. */
   const CAMPOS = "id,cabana_id,nombre,telefono,desde,hasta,token,adultos,ninos,tinaja,"
-               + "pago1_at,pago1_monto,pago2_at,pago2_monto";
+               + "pago1_at,pago1_monto,pago2_at,pago2_monto,confirmacion_enviada_at";
   /* Los que llegan en los proximos 30 dias. Mas alla no sirve de nada tenerlos
      delante todos los dias. */
   const tope = sumarDias(hoy, 30);
@@ -2641,6 +2641,7 @@ async function pintarHuespedes() {
      regalar un enlace que va a estar perdido en el chat cuando haga falta. */
   const tarjeta = (b, yaLlego) => {
     const cab = st.cabanas.find((c) => c.id === b.cabana_id);
+    const avisado = !!b.confirmacion_enviada_at;
     return `
       <div class="hu-card" data-huesped="${b.id}">
         <div class="hu-card-top">
@@ -2651,11 +2652,14 @@ async function pintarHuespedes() {
           </div>
           ${yaLlego
             ? `<span class="hu-pill ${b.token ? "ok" : ""}">${b.token ? "app enviada" : "sin app"}</span>`
-            : `<span class="hu-pill">${nochesEntre(b.desde, b.hasta)} noche${nochesEntre(b.desde, b.hasta) === 1 ? "" : "s"}</span>`}
+            : `<span class="hu-pill ${avisado ? "ok" : ""}">${avisado ? "confirmada" : "sin confirmar"}</span>`}
         </div>
         <div class="hu-card-acciones">
-          <button type="button" class="hu-btn-confirmar" data-confirmar="${b.id}">
-            Confirmar reserva
+          <!-- Sigue pulsable despues de enviada: un WhatsApp se puede no haber
+               ido, o el huesped puede pedir que se lo repitan. Lo que cambia es
+               que se ve que ya se hizo, para no mandarlo dos veces sin querer. -->
+          <button type="button" class="hu-btn-confirmar${avisado ? " hecho" : ""}" data-confirmar="${b.id}">
+            ${avisado ? "Confirmacion enviada &middot; reenviar" : "Confirmar reserva"}
           </button>
           ${yaLlego ? `<button type="button" class="hu-btn-wa" data-enviar="${b.id}">
             Enviar app por WhatsApp
@@ -2798,6 +2802,23 @@ async function huConfirmarReserva(id) {
   const texto = l.join("\n");
   const fono = String(b.telefono).replace(/[^0-9]/g, "");
   window.open(`https://wa.me/${fono}?text=${encodeURIComponent(texto)}`, "_blank");
+
+  /* Se anota DESPUES de abrir WhatsApp y sin bloquear: si la marca fallara,
+     lo peor que pasa es que el boton siga diciendo "confirmar" y se mande dos
+     veces. Al reves -marcar antes y que WhatsApp no se abra- el panel diria
+     que ya se aviso a alguien que no recibio nada, y eso no se descubre hasta
+     que el huesped llega sin saber nada. */
+  const ahora = new Date().toISOString();
+  b.confirmacion_enviada_at = ahora;
+  pintarHuespedes();
+  api(`bloqueos?id=eq.${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ confirmacion_enviada_at: ahora }),
+  }).catch(() => {
+    b.confirmacion_enviada_at = null;
+    avisar("Se abrio WhatsApp pero no se pudo anotar el aviso.", "error");
+    pintarHuespedes();
+  });
 }
 
 async function huEnviarApp(id) {

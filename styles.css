@@ -1051,6 +1051,12 @@ nav.tabs button[aria-selected="true"] { color: var(--timbre); box-shadow: inset 
   flex-basis: 100%;
   background: var(--timbre); border-color: var(--timbre); color: #fff;
 }
+/* Ya enviada: se apaga pero NO se desactiva. Un boton gris que no responde
+   deja al que lo pulsa sin saber si fallo o si es que ya estaba hecho. */
+.hu-btn-confirmar.hecho {
+  background: transparent; border-color: var(--raya);
+  color: var(--tinta-3); font-weight: 500;
+}
 .hu-btn-wa   { background: #25d366; border-color: #25d366; color: #0b2b16; }
 .hu-btn-chat { background: var(--hoja-2); color: var(--tinta); }
 .hu-btn-wa:active, .hu-btn-chat:active, .hu-btn-confirmar:active { transform: scale(0.97); }
