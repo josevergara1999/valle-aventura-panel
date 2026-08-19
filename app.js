@@ -1357,14 +1357,14 @@ function pintarBarra() {
      esta viendo, para no dar un tiron en cada toque). */
   if (st.desde !== ultimoDiaVisto) {
     ultimoDiaVisto = st.desde;
-    /* El desplazamiento suave tambien se pide desde JS, asi que el CSS no lo
-       alcanza: hay que preguntar por la preferencia aqui tambien. */
-    caja.scrollIntoView({ block: "nearest", behavior: menosMovimiento() ? "auto" : "smooth" });
+    /* Instantaneo y no suave: en iOS un desplazamiento suave pedido desde JS
+       deja atras la barra de pestanas, que es fija, y se queda clavada a media
+       pantalla. Con `nearest` el salto es de unos pocos pixeles o ninguno, asi
+       que no se pierde casi nada. */
+    caja.scrollIntoView({ block: "nearest" });
   }
 }
 let ultimoDiaVisto = null;
-const menosMovimiento = () =>
-  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* Entrar y salir del modo reserva. Salir no borra el dia: se vuelve a mirar el
    calendario donde se estaba, que es de donde se venia. */

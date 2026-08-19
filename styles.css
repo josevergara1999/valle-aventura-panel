@@ -969,12 +969,16 @@ button.mas span { font-size: 18px; font-weight: 700; line-height: 1; margin-top:
 /* Abajo, al alcance del pulgar. Es un panel que se usa de pie y con una mano. */
 nav.tabs {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
-  display: flex; background: color-mix(in srgb, var(--hoja) 82%, transparent);
-  border-top: 1px solid var(--raya);
+  display: flex; border-top: 1px solid var(--raya);
   padding-bottom: env(safe-area-inset-bottom);
-  /* Sin esto, el contenido que pasa por detrás se lee entero a través de la
-     barra y parece texto roto encima de las pestañas. */
-  backdrop-filter: var(--vidrio); -webkit-backdrop-filter: var(--vidrio);
+  /* OPACA, y sin `backdrop-filter`, a propósito — es el mismo criterio que ya
+     rige en `.tarjeta`. El filtro obliga a WebKit a promover la barra a su
+     propia capa de composición, y una capa fija promovida NO se vuelve a
+     anclar al viewport durante un desplazamiento suave pedido desde JS: se
+     quedaba clavada a media pantalla hasta el siguiente scroll a dedo.
+     Opaca cumple mejor lo que el filtro venía a resolver —que el contenido de
+     detrás no se lea a través— y no cuesta una capa. */
+  background: var(--hoja);
 }
 nav.tabs button {
   flex: 1; background: transparent; color: var(--tinta-3);
