@@ -161,11 +161,15 @@ const nochesEntre = (a, b) => (new Date(b) - new Date(a)) / 86400000;
 /* La semana parte en lunes. getDay() devuelve 0 para domingo, de ahi el +6 %7. */
 const lunesDe = (f) => sumarDias(f, -((new Date(f + "T00:00:00").getDay() + 6) % 7));
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
-const fechaCorta = (s) => { const p = s.split("-").map(Number); return `${p[2]} ${MESES[p[1] - 1]}`; };
+/* Sin fecha devuelven cadena vacia en vez de reventar. Las dos se llaman desde
+   dentro de plantillas largas, y ahi una excepcion no deja un dato en blanco:
+   se lleva por delante la ficha entera y no se abre nada. */
+const fechaCorta = (s) => { if (!s) return ""; const p = s.split("-").map(Number); return `${p[2]} ${MESES[p[1] - 1]}`; };
 /* Con dia de la semana: mirando un dia suelto, "viernes 22" ubica mucho mas
    rapido que "22 ago" — la pregunta del cliente casi siempre viene en fines de
    semana, no en numeros. */
 const fechaLarga = (s) => {
+  if (!s) return "";
   const p = s.split("-").map(Number);
   const t = new Date(p[0], p[1] - 1, p[2])
     .toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" });
@@ -286,7 +290,11 @@ async function cargarBase() {
    columna nueva en la base entra sola, y una que se renombre rompe en silencio
    una de las dos consultas y no la otra. */
 const COLUMNAS = "id,cabana_id,desde,hasta,origen,tipo,canal,nombre,telefono,email," +
-  "adultos,ninos,mascotas,tinaja,tinaja_hora,nota," +
+  // `tinaja_fecha` viaja pegada a `tinaja_hora`: una estadia de varias noches
+  // no dice por si sola que noche se usa la tinaja. Sin pedirla, la reserva
+  // llegaba con `tinaja` en true y sin fecha — el turno no salia en Finanzas y
+  // la ficha reventaba al intentar pintarlo.
+  "adultos,ninos,mascotas,tinaja,tinaja_fecha,tinaja_hora,nota," +
   // Una reserva que entro por la web nace 'pendiente' y ocupa el calendario
   // solo hasta `expira_at`, mientras el cliente paga. Sin traer estas dos
   // columnas, el panel la mostraria igual que una pagada y contarias con una
@@ -1932,9 +1940,12 @@ function detalleReserva(b, idPrecio, opciones = {}) {
        (!esBloqueo && st.reglas ? ` &middot; ${hhmm(st.reglas.check_out)}` : ""))}
     ${opciones.sinCabana ? "" : fila("Cabaña", esc(nombreCabana(b.cabana_id)))}
     ${esBloqueo ? "" : fila("Personas", textoHuespedes(b) || faltante)}
-    ${esBloqueo ? "" : fila("Tinaja", b.tinaja
-       ? `${fechaCorta(b.tinaja_fecha)} &middot; ${hhmm(b.tinaja_hora)} — ${horaFin(b.tinaja_hora)}`
-       : "")}
+    ${esBloqueo ? "" : fila("Tinaja", !b.tinaja ? ""
+       : b.tinaja_fecha
+         ? `${fechaCorta(b.tinaja_fecha)} &middot; ${hhmm(b.tinaja_hora)} — ${horaFin(b.tinaja_hora)}`
+         /* Cobrada pero sin turno: no se deja en blanco, que un vacio no se
+            distingue de un "no lleva tinaja". */
+         : "<span style='color:var(--tx-3)'>sin turno — vuelve a guardarla</span>")}
     ${esBloqueo ? "" : fila("Telefono", b.telefono
        ? `<a href="tel:${esc(b.telefono.replace(/\s/g, ""))}">${esc(b.telefono)}</a>`
        : faltante)}
