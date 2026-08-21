@@ -196,10 +196,20 @@ const comando = (dev: { canal: number | null }, accion: string) =>
     ? { switch: accion }
     : { switches: [{ switch: accion, outlet: dev.canal }] };
 
-const accionar = (dev: { id: string; canal: number | null }, accion: string) =>
+/* El comando va al APARATO, no a la fila. Una fila puede ser un canal suelto de
+   un interruptor de tres, y eWeLink solo entiende el aparato entero mas el
+   numero de salida. */
+const accionar = (
+  dev: { id: string; device_id?: string | null; canal: number | null },
+  accion: string,
+) =>
   ewelink('/v2/device/thing/status', {
     method: 'POST',
-    body: JSON.stringify({ type: 1, id: dev.id, params: comando(dev, accion) }),
+    body: JSON.stringify({
+      type: 1,
+      id: dev.device_id ?? dev.id,
+      params: comando(dev, accion),
+    }),
   });
 
 // ── Las rutas ──────────────────────────────────────────────────────────────
@@ -298,27 +308,75 @@ async function callback(url: URL) {
    Etiquetar NO se pisa al volver a listar: el `merge` solo refresca nombre,
    modelo y si está en línea. */
 async function dispositivos() {
+  /* Las salas de eWeLink son lo unico que distingue dos "Terraza": una es de la
+     Cabaña 2 y otra de la Cabaña 4, y en una lista plana son la misma palabra
+     dos veces. No se traducen a cabaña automaticamente —que "Cabaña 4" sea
+     Nevados o El Chueco no lo puede adivinar nadie sin arriesgarse a encender
+     la equivocada—, pero sirven para reconocerlas de un vistazo. */
+  let salas: Record<string, string> = {};
+  try {
+    const fam = await ewelink('/v2/family');
+    for (const f of fam?.familyList ?? [])
+      for (const r of f.roomList ?? []) salas[r.id] = r.name;
+  } catch (e) {
+    /* Sin salas la lista sigue sirviendo, solo cuesta mas leerla. No vale la
+       pena tumbar el listado entero por esto. */
+    console.error('familias:', (e as Error).message);
+    salas = {};
+  }
+
   const d = await ewelink('/v2/device/thing?num=0');
   const lista = (d?.thingList ?? [])
     .filter((t: { itemType: number }) => t.itemType === 1)
     .map((t: { itemData: Record<string, unknown> }) => t.itemData);
 
   const ahora = new Date().toISOString();
+  const filas = [];
+
   for (const dev of lista) {
-    const fila = {
-      id: dev.deviceid,
-      nombre: dev.name ?? dev.deviceid,
-      uiid: (dev.extra as { uiid?: number } | undefined)?.uiid ?? null,
+    const sala = salas[dev.roomid as string] ?? null;
+    const uiid = (dev.extra as { uiid?: number } | undefined)?.uiid ?? null;
+    const base = {
+      device_id: dev.deviceid,
+      sala,
+      uiid,
       en_linea: dev.online === true,
       visto_at: ahora,
     };
+
+    /* Los de varios canales traen `switches`; los de uno, `switch`. Cada canal
+       va como su propia fila porque en la cabaña son cosas distintas: Canal1 la
+       terraza y Canal3 una bomba. Etiquetar el aparato entero obligaria a
+       encender la bomba para encender la terraza. */
+    const params = (dev.params ?? {}) as { switches?: unknown[] };
+    const canales = Array.isArray(params.switches) ? params.switches.length : 0;
+
+    if (canales > 1) {
+      for (let i = 0; i < canales; i++) {
+        filas.push({
+          ...base,
+          id: `${dev.deviceid}:${i}`,
+          canal: i,
+          nombre: `${dev.name ?? dev.deviceid} - Canal ${i + 1}`,
+        });
+      }
+    } else {
+      filas.push({ ...base, id: dev.deviceid, canal: null, nombre: dev.name ?? dev.deviceid });
+    }
+  }
+
+  /* De una sola vez y no fila a fila: son decenas de aparatos y una llamada por
+     cada uno tarda lo suyo con la señal de la montaña.
+     El `merge` solo toca las columnas que van en el cuerpo, asi que `tipo` y
+     `cabana_id` —lo unico que se etiqueta a mano— sobreviven a volver a listar. */
+  if (filas.length) {
     await sb('dispositivos?on_conflict=id', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(fila),
+      body: JSON.stringify(filas),
     });
   }
-  return await sb('dispositivos?select=*&order=cabana_id.asc.nullsfirst,orden.asc,nombre.asc');
+  return await sb('dispositivos?select=*&order=sala.asc.nullslast,nombre.asc');
 }
 
 /* Encender o apagar ahora, desde el panel. A diferencia de /cron, esto SÍ
@@ -332,7 +390,7 @@ async function accion(body: { dispositivo?: string; cabana?: string; rol?: strin
   else if (body.cabana) filtro = `cabana_id=eq.${body.cabana}&tipo=eq.luz`;
   else throw new Error('Falta decir qué aparato.');
 
-  const devs = await sb(`dispositivos?${filtro}&activo=is.true&select=id,nombre,canal`);
+  const devs = await sb(`dispositivos?${filtro}&activo=is.true&select=id,device_id,nombre,canal`);
   if (!devs?.length) throw new Error('No hay ningún aparato etiquetado para eso.');
 
   /* Una cabaña puede tener varias luces y se encienden todas. Si una falla, se
@@ -364,7 +422,7 @@ async function cron() {
       const filtro = o.rol === 'tinaja'
         ? 'tipo=eq.tinaja'
         : `cabana_id=eq.${o.cabana_id}&tipo=eq.luz`;
-      const devs = await sb(`dispositivos?${filtro}&activo=is.true&select=id,nombre,canal`);
+      const devs = await sb(`dispositivos?${filtro}&activo=is.true&select=id,device_id,nombre,canal`);
       if (!devs?.length) throw new Error('No hay aparato etiquetado para esta orden.');
       for (const dev of devs) await accionar(dev, o.accion);
       await rpc('ewelink_orden_resultado', { p_orden: o.id, p_ok: true });

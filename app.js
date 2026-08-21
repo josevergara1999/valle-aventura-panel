@@ -3372,8 +3372,14 @@ async function elAjustes(caja) {
       <div class="el-aparatos">
         ${aparatos.length ? aparatos.map((a) => `
           <div class="el-ap">
-            <span class="el-ap-nombre">${esc(a.nombre)}${a.en_linea === false
-              ? '<span class="luz-nota">no responde</span>' : ""}</span>
+            <span class="el-ap-nombre">${esc(a.nombre)}
+              ${/* La sala de eWeLink debajo del nombre. Sin ella hay dos
+                    "Terraza" identicas en la lista y no hay forma de saber cual
+                    es de que cabaña — ni de distinguir las de las cabañas de
+                    las de la bodega y la veterinaria, que estan en la misma
+                    cuenta y aqui no pintan nada. */ ""}
+              ${a.sala ? `<span class="luz-nota">${esc(a.sala)}</span>` : ""}
+              ${a.en_linea === false ? '<span class="luz-nota">no responde</span>' : ""}</span>
             <select data-ap-tipo="${esc(a.id)}" aria-label="Que es">
               <option value="otro"${a.tipo === "otro" ? " selected" : ""}>Sin usar</option>
               <option value="luz"${a.tipo === "luz" ? " selected" : ""}>Luz</option>
