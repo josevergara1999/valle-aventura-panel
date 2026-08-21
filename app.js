@@ -2633,9 +2633,14 @@ async function huCargar() {
   huBadge();
 }
 
+/* Cerrada es cerrada, se haya concedido o negado. Un turno de tinaja
+   rechazado ya no espera nada de nadie: si siguiera contando como pendiente,
+   el numero rojo no bajaria nunca y dejaria de significar algo. */
+const HU_CERRADA = (x) => x.estado === "resuelta" || x.estado === "rechazada";
+
 /* El numero rojo de la pestania. Sin esto habria que entrar a mirar. */
 function huBadge() {
-  const n = hu.solicitudes.filter((x) => x.estado !== "resuelta").length;
+  const n = hu.solicitudes.filter((x) => !HU_CERRADA(x)).length;
   const b = $("#hu-badge");
   if (!b) return;
   b.hidden = n === 0;
@@ -2692,7 +2697,7 @@ async function pintarHuespedes() {
 
   /* ── Solicitudes ── */
   const lista = hu.filtro === "pendientes"
-    ? hu.solicitudes.filter((x) => x.estado !== "resuelta")
+    ? hu.solicitudes.filter((x) => !HU_CERRADA(x))
     : hu.solicitudes;
 
   const cajaS = $("#hu-solicitudes");
@@ -2716,7 +2721,7 @@ async function pintarHuespedes() {
       detalle = esc(x.detalle);
     }
     return `
-      <div class="hu-sol ${x.estado === "resuelta" ? "hecha" : ""} tipo-${x.tipo}">
+      <div class="hu-sol ${HU_CERRADA(x) ? "hecha" : ""} tipo-${x.tipo}">
         <div class="hu-sol-main">
           <div class="hu-sol-head">
             <span class="hu-sol-tipo">${HU_ETIQUETA[x.tipo] || x.tipo}</span>
@@ -2728,6 +2733,11 @@ async function pintarHuespedes() {
         </div>
         ${x.estado === "resuelta"
           ? '<span class="hu-sol-ok">Listo</span>'
+          : x.estado === "rechazada"
+          /* Dicho tal cual, y no como un "listo" mas: al revisar el dia hay que
+             poder ver de un vistazo a quien se le nego un turno, que es quien
+             probablemente espera que le ofrezcan otra hora. */
+          ? '<span class="hu-sol-nok">Rechazada</span>'
           : x.tipo === "tinaja"
             /* La tinaja no es "hecho" o "no hecho": es un turno que hay que
                conceder o negar, y hasta que se aprueba no existe en la agenda.
