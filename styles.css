@@ -1216,3 +1216,50 @@ nav.tabs button[aria-selected="true"] { color: var(--timbre); box-shadow: inset 
   display: block; width: 100%; max-width: 320px;
   margin-top: 8px; border-radius: 10px;
 }
+
+/* ── eWeLink: luces y aparatos ──────────────────────────────────────────────
+   Sin colores nuevos. Todo sale de tokens.css, así que cambiar la identidad
+   del panel sigue siendo tocar un archivo. */
+.luz-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--e3);
+  padding: var(--e3) 0;
+  border-bottom: var(--alto-raya) solid var(--raya);
+}
+.luz-fila:last-child { border-bottom: 0; padding-bottom: 0; }
+.luz-cabana { font-weight: 600; min-width: 0; }
+
+/* La cabaña con gente lleva el margen del cuaderno a la izquierda: es la misma
+   marca que ya distingue lo que está tomado, y aquí dice "aquí hay alguien
+   durmiendo" sin añadir un color más. */
+.luz-fila.ocupada { padding-left: var(--e3); border-left: 3px solid var(--timbre); }
+
+.luz-nota {
+  display: block;
+  font-size: 12px;
+  color: var(--tinta-3);
+  font-weight: 400;
+}
+.luz-botones { display: flex; gap: var(--e2); flex-shrink: 0; }
+.luz-botones button { padding: var(--e2) var(--e3); font-size: 13px; }
+
+.el-aparatos { margin-top: var(--e3); }
+.el-ap {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: var(--e2);
+  padding: var(--e2) 0;
+  border-bottom: var(--alto-raya) solid var(--raya);
+}
+.el-ap:last-child { border-bottom: 0; }
+.el-ap-nombre { min-width: 0; font-size: 14px; overflow-wrap: anywhere; }
+.el-ap select { font-size: 13px; padding: var(--e1) var(--e2); }
+
+/* En un teléfono angosto los dos desplegables no caben al lado del nombre. */
+@media (max-width: 380px) {
+  .el-ap { grid-template-columns: 1fr 1fr; }
+  .el-ap-nombre { grid-column: 1 / -1; }
+}

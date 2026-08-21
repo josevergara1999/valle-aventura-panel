@@ -1943,6 +1943,13 @@ function detalleReserva(b, idPrecio, opciones = {}) {
     ${esBloqueo ? "" : fila("Tinaja", !b.tinaja ? ""
        : b.tinaja_fecha
          ? `${fechaCorta(b.tinaja_fecha)} &middot; ${hhmm(b.tinaja_hora)} — ${horaFin(b.tinaja_hora)}`
+           /* Solo si hay una tinaja etiquetada de verdad. Prometer "se enciende
+              sola" sin aparato detras seria peor que no decir nada: dejarias de
+              subir a encenderla. */
+           + (el.estado?.conectado && el.hayTinaja
+              ? `<br><span style="color:var(--tx-3);font-size:12px">se enciende sola a las ${
+                   horaMenos(b.tinaja_hora, st.reglas?.tinaja_antes_min ?? 120)}</span>`
+              : "")
          /* Cobrada pero sin turno: no se deja en blanco, que un vacio no se
             distingue de un "no lleva tinaja". */
          : "<span style='color:var(--tx-3)'>sin turno — vuelve a guardarla</span>")}
@@ -2055,6 +2062,16 @@ const horaFin = (t) => {
   if (h.length < 2 || Number.isNaN(h[0])) return "";
   const min = h[0] * 60 + h[1] + (st.reglas?.tinaja_horas ?? 2) * 60;
   return `${String(Math.floor(min / 60) % 24).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+};
+
+/* A que hora se enciende sola, contando el preencendido. Mismo cuidado que
+   arriba con las vueltas del reloj: restarle dos horas a un turno de la manana
+   cruza la medianoche hacia atras, y sin el modulo saldria una hora negativa. */
+const horaMenos = (t, minutos) => {
+  const h = (t || "").slice(0, 5).split(":").map(Number);
+  if (h.length < 2 || Number.isNaN(h[0])) return "";
+  const min = ((h[0] * 60 + h[1] - minutos) % 1440 + 1440) % 1440;
+  return `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
 };
 
 /* Editar. Las fechas tambien, porque "me corro un dia" es la peticion mas comun
@@ -3203,6 +3220,11 @@ async function pintarAvisos() {
   const off = $("#av-off"); if (off) off.addEventListener("click", avisosDesactivar);
   caja.querySelectorAll("[data-cat]").forEach((i) =>
     i.addEventListener("change", () => avisosCategoria(i.dataset.cat, i.checked)));
+
+  /* Los ajustes de eWeLink se pintan al final de esta misma pantalla: es la
+     pestaña de ajustes aunque se llame Avisos, y abrir un septimo destino para
+     algo que se toca dos veces en la vida no lo vale. */
+  await elAjustes(caja);
 }
 
 /* El service worker avisa a que pestania ir cuando se toca una notificacion. */
@@ -3214,6 +3236,226 @@ if ("serviceWorker" in navigator) {
     }
   });
 }
+
+/* ============================================================================
+   eWeLink — las luces y el timer de la tinaja
+   ============================================================================
+   El panel NO habla con eWeLink: habla con la Edge Function, que es la unica
+   que tiene la clave. Aqui no hay ni un token de CoolKit, y no puede haberlo:
+   esto es HTML estatico y cualquiera lee su codigo fuente.
+
+   Y NO se muestra si una luz esta encendida o apagada. No es un olvido: el
+   huesped la apaga desde el interruptor de la pared cuando quiere, y entonces
+   lo que dijera esta pantalla seria mentira hasta la siguiente consulta. Dos
+   botones que hacen lo que dicen valen mas que un estado que se queda viejo
+   solo. Es la misma regla por la que el service worker no cachea datos. */
+
+const EL_FN = `${SUPABASE_URL}/functions/v1/ewelink`;
+const el = { estado: null, hayTinaja: false };
+
+async function elLlamar(ruta, cuerpo) {
+  const r = await fetch(`${EL_FN}/${ruta}`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${sesion?.access_token || ""}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(cuerpo || {}),
+  });
+  const d = await r.json().catch(() => null);
+  /* El mensaje viene de la funcion y ya esta escrito para leerse ("no hay
+     aparato etiquetado para eso"), asi que se propaga tal cual. */
+  if (!r.ok) throw new Error(d?.error || `Error ${r.status}`);
+  return d;
+}
+
+async function elCargarEstado() {
+  try {
+    el.estado = await api("rpc/ewelink_estado", { method: "POST", body: "{}" });
+    const t = await api("dispositivos?tipo=eq.tinaja&activo=is.true&select=id&limit=1");
+    el.hayTinaja = !!(t && t.length);
+  } catch (e) { el.estado = null; el.hayTinaja = false; }
+}
+
+/* La franja de luces, debajo de Hoy. Si no hay ninguna etiquetada no ocupa
+   nada: una tarjeta vacia que dice "aqui iran las luces" es una tarjeta que se
+   salta con el dedo todos los dias. */
+async function pintarLuces() {
+  const caja = $("#luces-hoy");
+  if (!caja) return;
+  if (!el.estado) await elCargarEstado();
+  if (!el.estado?.conectado) { caja.innerHTML = ""; return; }
+
+  let luces = [];
+  try {
+    luces = await api("dispositivos?tipo=eq.luz&activo=is.true&select=cabana_id");
+  } catch (e) { luces = []; }
+  const conLuz = new Set(luces.map((l) => l.cabana_id).filter(Boolean));
+  if (!conLuz.size) { caja.innerHTML = ""; return; }
+
+  const hoy = hoyISO();
+  const ocupadas = new Set(
+    st.hoy.filter((b) => b.desde <= hoy && b.hasta > hoy).map((b) => b.cabana_id));
+
+  caja.innerHTML = `<div class="tarjeta">
+    <p class="titulo-ocupadas">Luces</p>
+    ${st.cabanas.filter((c) => conLuz.has(c.id)).map((c) => `
+      <div class="luz-fila${ocupadas.has(c.id) ? " ocupada" : ""}">
+        <span class="luz-cabana">${esc(c.nombre)}${ocupadas.has(c.id)
+          ? '<span class="luz-nota">con huespedes</span>' : ""}</span>
+        <span class="luz-botones">
+          <button type="button" class="secundario" data-luz="${c.id}" data-acc="off">Apagar</button>
+          <button type="button" data-luz="${c.id}" data-acc="on">Encender</button>
+        </span>
+      </div>`).join("")}
+  </div>`;
+}
+
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-luz]");
+  if (!b) return;
+  const cab = b.dataset.luz;
+  const acc = b.dataset.acc;
+
+  /* Apagarle la luz a una cabaña con gente dentro pregunta antes, y la pregunta
+     dice a quien. El error tipico no es apretar sin querer: es apretar en la
+     cabaña equivocada — el mismo motivo por el que el boton de Quitar salio de
+     cada fila y se fue dentro de la ficha. */
+  if (acc === "off" && b.closest(".luz-fila")?.classList.contains("ocupada")
+      && !confirm(`Hay huespedes en ${nombreCabana(cab)}. ¿Apagar sus luces igual?`)) return;
+
+  const antes = b.textContent;
+  b.disabled = true;
+  b.textContent = "...";
+  try {
+    await elLlamar("accion", { cabana: cab, accion: acc });
+    avisar(`${nombreCabana(cab)}: luces ${acc === "on" ? "encendidas" : "apagadas"}.`, "ok");
+  } catch (err) {
+    avisar(err.message, "error");
+  }
+  b.disabled = false;
+  b.textContent = antes;
+});
+
+/* Conectar la cuenta y decir que es cada aparato. Vive dentro de Avisos —que en
+   realidad es la pestaña de ajustes— y no en un destino propio: esto se toca
+   dos veces en la vida, el dia que se instala y el dia que se cambia un
+   aparato. */
+async function elAjustes(caja) {
+  await elCargarEstado();
+  const s = el.estado || {};
+  let aparatos = [];
+  if (s.conectado) {
+    try { aparatos = await api("dispositivos?select=*&order=nombre"); } catch (e) { aparatos = []; }
+  }
+
+  const cabanasComoOpciones = (sel) => st.cabanas.map((c) =>
+    `<option value="${c.id}"${c.id === sel ? " selected" : ""}>${esc(c.nombre)}</option>`).join("");
+
+  caja.insertAdjacentHTML("beforeend", `
+    <h2 class="titulo-seccion" style="margin-top:26px">Luces y tinaja</h2>
+    <div class="av-estado ${s.conectado ? "activo" : "inactivo"}">
+      <div>
+        <b>${s.conectado ? "Conectado" : "Sin conectar"}</b>
+        <div class="av-sub">${s.conectado
+          ? `${esc(s.cuenta || "cuenta de eWeLink")} &middot; el permiso caduca en ${s.dias_permiso} dias`
+          : "Las luces y el timer de la tinaja no funcionan hasta autorizar la cuenta."}</div>
+      </div>
+      <button type="button" class="${s.conectado ? "secundario" : ""}" id="el-conectar">
+        ${s.conectado ? "Reautorizar" : "Conectar"}</button>
+    </div>
+    ${!s.conectado ? "" : `
+      <div class="fila" style="margin-top:var(--e3)">
+        <button type="button" class="secundario ancho" id="el-buscar">Buscar aparatos</button>
+      </div>
+      <div class="el-aparatos">
+        ${aparatos.length ? aparatos.map((a) => `
+          <div class="el-ap">
+            <span class="el-ap-nombre">${esc(a.nombre)}${a.en_linea === false
+              ? '<span class="luz-nota">no responde</span>' : ""}</span>
+            <select data-ap-tipo="${esc(a.id)}" aria-label="Que es">
+              <option value="otro"${a.tipo === "otro" ? " selected" : ""}>Sin usar</option>
+              <option value="luz"${a.tipo === "luz" ? " selected" : ""}>Luz</option>
+              <option value="tinaja"${a.tipo === "tinaja" ? " selected" : ""}>Tinaja</option>
+            </select>
+            <select data-ap-cabana="${esc(a.id)}" aria-label="De que cabaña"
+                    ${a.tipo === "luz" ? "" : "disabled"}>
+              <option value="">Cabaña...</option>
+              ${cabanasComoOpciones(a.cabana_id)}
+            </select>
+          </div>`).join("")
+        : '<p class="lista-vacia">Toca <b>Buscar aparatos</b> y salen los de tu cuenta de eWeLink, con el nombre que tienen alli.</p>'}
+      </div>
+      <p class="av-nota">La tinaja se enciende sola ${st.reglas?.tinaja_antes_min ?? 120} minutos
+        antes del turno que apruebes, y se apaga al terminar. Si no enciende, te llega un aviso.</p>`}`);
+
+  const con = $("#el-conectar");
+  if (con) con.addEventListener("click", async () => {
+    con.disabled = true;
+    con.textContent = "Abriendo...";
+    try {
+      /* Dos pasos —pedir la direccion y luego ir— porque una navegacion del
+         navegador no puede llevar la cabecera de sesion. La parte que exige
+         estar identificado es esta llamada. */
+      const { url } = await elLlamar("preparar");
+      location.href = url;
+    } catch (e) {
+      avisar(e.message, "error");
+      con.disabled = false;
+      con.textContent = "Conectar";
+    }
+  });
+
+  const bus = $("#el-buscar");
+  if (bus) bus.addEventListener("click", async () => {
+    bus.disabled = true;
+    bus.textContent = "Buscando...";
+    try {
+      await elLlamar("dispositivos");
+      avisar("Listado actualizado.", "ok");
+      await pintarAvisos();
+      return;
+    } catch (e) { avisar(e.message, "error"); }
+    bus.disabled = false;
+    bus.textContent = "Buscar aparatos";
+  });
+
+  caja.querySelectorAll("[data-ap-tipo]").forEach((sel) =>
+    sel.addEventListener("change", () => elGuardarAparato(sel.dataset.apTipo,
+      sel.value === "luz" ? { tipo: "luz" } : { tipo: sel.value, cabana_id: null })));
+  caja.querySelectorAll("[data-ap-cabana]").forEach((sel) =>
+    sel.addEventListener("change", () =>
+      elGuardarAparato(sel.dataset.apCabana, { cabana_id: sel.value || null })));
+}
+
+async function elGuardarAparato(id, campos) {
+  try {
+    await api(`dispositivos?id=eq.${encodeURIComponent(id)}`,
+      { method: "PATCH", body: JSON.stringify(campos) });
+    el.estado = null;      // que la franja de luces se entere del cambio
+    await pintarAvisos();
+    pintarLuces();
+  } catch (e) {
+    /* El caso que mas va a salir: marcar una segunda tinaja. La base lo impide
+       —hay una sola para las tres cabañas— y el mensaje lo dice. */
+    avisar(e.message, "error");
+  }
+}
+
+/* La vuelta de eWeLink trae el resultado en la direccion. Se lee, se dice y se
+   limpia: si se quedara, recargar la pagina volveria a anunciar algo que ya
+   paso. Mismo motivo por el que la app del huesped borra su token de la barra. */
+(function () {
+  const p = new URLSearchParams(location.search);
+  const r = p.get("ewelink");
+  if (!r) return;
+  p.delete("ewelink");
+  history.replaceState(null, "", location.pathname + (p.toString() ? `?${p}` : ""));
+  setTimeout(() => avisar(
+    r === "ok" ? "eWeLink conectado." : `No se pudo conectar eWeLink (${r}).`,
+    r === "ok" ? "ok" : "error"), 900);
+})();
 
 /* -------------------------------------------------------------- Pestanas -- */
 document.querySelectorAll("nav.tabs button").forEach((b) => {
@@ -3266,6 +3508,9 @@ async function iniciar() {
     pintarCalendario();
     pintarHoy();
     pintarTarifas();
+    /* Sin `await`: si la funcion de eWeLink tarda o esta caida, el panel tiene
+       que abrir igual. Las luces son un extra; la agenda es el trabajo. */
+    pintarLuces();
 
     $("#sub-header").textContent =
       `Base ${clp(st.tarifaBase.precio_base)} - minimo ${st.reglas.minimo_noches} noches`;
