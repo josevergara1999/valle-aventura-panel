@@ -73,13 +73,6 @@ finish review, the verdict, and DESIGN.md
       <h2 class="titulo-seccion" id="titulo-hoy">Hoy</h2>
       <div id="movimiento-hoy"></div>
 
-      <!-- Las luces, debajo de Hoy y no en una pestaña propia. La barra ya
-           tiene seis destinos y con siete los textos se parten en un teléfono;
-           pero además esto no es un sitio al que se va, es algo que se toca de
-           pasada mientras miras quién llega — el mismo argumento que sacó al
-           cotizador de la barra y lo metió dentro de Precios.
-           Sale sola si hay luces etiquetadas; si no, no ocupa nada. -->
-      <div id="luces-hoy"></div>
 
       <div class="tarjeta">
         <!-- Mes para planificar, semana para trabajar: la cuadrícula responde
@@ -167,6 +160,15 @@ finish review, the verdict, and DESIGN.md
       </div>
       <div id="hu-solicitudes" class="hu-lista"></div>
     </section>
+
+    <!-- LUCES -->
+    <!-- Destino propio, no un bloque dentro de Agenda. Es una pantalla a la que
+         se VA: se abre para encender o apagar algo, no de pasada mientras se
+         mira quién llega, y mezclada con la agenda del día estorbaba las dos.
+         La tinaja aparece aquí también aunque se encienda sola: hay noches en
+         que se usa sin turno, y no tener el botón obliga a subir a la máquina.
+         Lo arma entero el JS: qué cabañas salen depende de qué se etiquetó. -->
+    <section id="vista-luces" hidden></section>
 
     <!-- Ajustes de notificaciones. Vive aqui y no en un menu escondido porque
          es lo primero que hay que hacer al instalar el panel en un telefono
@@ -358,6 +360,7 @@ finish review, the verdict, and DESIGN.md
   <nav class="tabs" role="tablist">
     <button type="button" role="tab" data-vista="calendario" aria-selected="true">Agenda</button>
     <button type="button" role="tab" data-vista="huespedes" aria-selected="false">Huespedes<span id="hu-badge" class="hu-badge" hidden></span></button>
+    <button type="button" role="tab" data-vista="luces"      aria-selected="false">Luces</button>
     <button type="button" role="tab" data-vista="aseos"      aria-selected="false">Aseos</button>
     <button type="button" role="tab" data-vista="finanzas"   aria-selected="false">Finanzas</button>
     <button type="button" role="tab" data-vista="tarifas"    aria-selected="false">Precios</button>

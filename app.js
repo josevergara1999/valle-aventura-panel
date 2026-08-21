@@ -3278,38 +3278,99 @@ async function elCargarEstado() {
   } catch (e) { el.estado = null; el.hayTinaja = false; }
 }
 
-/* La franja de luces, debajo de Hoy. Si no hay ninguna etiquetada no ocupa
-   nada: una tarjeta vacia que dice "aqui iran las luces" es una tarjeta que se
-   salta con el dedo todos los dias. */
-async function pintarLuces() {
-  const caja = $("#luces-hoy");
-  if (!caja) return;
-  if (!el.estado) await elCargarEstado();
-  if (!el.estado?.conectado) { caja.innerHTML = ""; return; }
+/* Las horas de las ordenes vienen de la base en UTC. Cortar la cadena daria
+   las 21:00 para un turno de las 17:00 de la tarde; hay que convertirlas. */
+const horaLocal = (iso) =>
+  new Date(iso).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
+const diaLocal = (iso) =>
+  new Date(iso).toLocaleDateString("es-CL", { day: "numeric", month: "short" });
 
+/* La pantalla de las luces. Una tarjeta por cabaña, con lo que hace falta saber
+   antes de tocar el boton: cuantas luces tiene, si hay alguien dentro, y si
+   alguna no esta respondiendo. */
+async function pintarLuces() {
+  const caja = $("#vista-luces");
+  if (!caja) return;
+  caja.innerHTML = '<h2 class="titulo-seccion">Luces</h2>'
+    + '<p class="lista-vacia">Cargando...</p>';
+
+  await elCargarEstado();
+  if (!el.estado?.conectado) {
+    caja.innerHTML = `<h2 class="titulo-seccion">Luces</h2>
+      <div class="tarjeta"><p class="lista-vacia">
+        eWeLink no esta conectado. Ve a <b>Avisos</b> y toca <b>Conectar</b>.
+      </p></div>`;
+    return;
+  }
+
+  /* Se piden las cabañas aparte y no se usa `st.cabanas`: ahi solo estan las
+     que se arriendan, y la casa del host tambien tiene luces que encender. */
+  let cabs = st.cabanas;
   let luces = [];
+  let prox = null;
   try {
-    luces = await api("dispositivos?tipo=eq.luz&activo=is.true&select=cabana_id");
-  } catch (e) { luces = []; }
-  const conLuz = new Set(luces.map((l) => l.cabana_id).filter(Boolean));
-  if (!conLuz.size) { caja.innerHTML = ""; return; }
+    [cabs, luces] = await Promise.all([
+      api("cabanas?select=id,nombre,orden&order=orden"),
+      api("dispositivos?tipo=eq.luz&activo=is.true&select=cabana_id,en_linea"),
+    ]);
+    /* El proximo encendido de tinaja que hay programado. Se enseña aunque haya
+       botones: saber que se enciende sola a las 17:00 es lo que evita subir a
+       encenderla "por si acaso" y dejarla ocho horas. */
+    prox = (await api("ewelink_ordenes?rol=eq.tinaja&accion=eq.on&estado=eq.pendiente"
+                    + "&select=momento&order=momento.asc&limit=1"))?.[0] || null;
+  } catch (e) { /* se pinta con lo que haya */ }
+
+  const porCabana = new Map();
+  (luces || []).forEach((l) => {
+    if (!l.cabana_id) return;
+    if (!porCabana.has(l.cabana_id)) porCabana.set(l.cabana_id, []);
+    porCabana.get(l.cabana_id).push(l);
+  });
 
   const hoy = hoyISO();
   const ocupadas = new Set(
     st.hoy.filter((b) => b.desde <= hoy && b.hasta > hoy).map((b) => b.cabana_id));
 
-  caja.innerHTML = `<div class="tarjeta">
-    <p class="titulo-ocupadas">Luces</p>
-    ${st.cabanas.filter((c) => conLuz.has(c.id)).map((c) => `
-      <div class="luz-fila${ocupadas.has(c.id) ? " ocupada" : ""}">
-        <span class="luz-cabana">${esc(c.nombre)}${ocupadas.has(c.id)
-          ? '<span class="luz-nota">con huespedes</span>' : ""}</span>
-        <span class="luz-botones">
-          <button type="button" class="secundario" data-luz="${c.id}" data-acc="off">Apagar</button>
-          <button type="button" data-luz="${c.id}" data-acc="on">Encender</button>
-        </span>
-      </div>`).join("")}
-  </div>`;
+  const tarjeta = (titulo, sub, clave, ocupada) => `
+    <div class="tarjeta luz-tarjeta${ocupada ? " ocupada" : ""}">
+      <div class="luz-cab">
+        <b>${esc(titulo)}</b>
+        <span class="luz-nota">${sub}</span>
+      </div>
+      <div class="fila">
+        <button type="button" class="secundario" data-luz="${clave}" data-acc="off">Apagar</button>
+        <button type="button" data-luz="${clave}" data-acc="on">Encender</button>
+      </div>
+    </div>`;
+
+  const conLuces = (cabs || []).filter((c) => porCabana.has(c.id));
+
+  const cuerpo = conLuces.map((c) => {
+    const ls = porCabana.get(c.id);
+    const fuera = ls.filter((l) => l.en_linea === false).length;
+    const sub = [
+      `${ls.length} ${ls.length === 1 ? "luz" : "luces"}`,
+      ocupadas.has(c.id) ? "con huespedes" : null,
+      /* Que un aparato no responda se dice ANTES de tocar el boton. Si no, se
+         aprieta, no pasa nada, y no hay forma de saber si fallo el panel o es
+         que esa luz lleva dos dias sin señal. */
+      fuera ? `${fuera} sin responder` : null,
+    ].filter(Boolean).join(" &middot; ");
+    return tarjeta(c.nombre, sub, c.id, ocupadas.has(c.id));
+  }).join("");
+
+  const tinaja = el.hayTinaja
+    ? tarjeta("Tinaja",
+        prox ? `se enciende sola el ${diaLocal(prox.momento)} a las ${horaLocal(prox.momento)}`
+             : "sin turno programado",
+        "__tinaja", false)
+    : "";
+
+  caja.innerHTML = `<h2 class="titulo-seccion">Luces</h2>
+    ${cuerpo || `<div class="tarjeta"><p class="lista-vacia">
+      Ninguna luz esta asignada a una cabaña todavia. Se etiquetan en
+      <b>Avisos</b>, abajo del todo.</p></div>`}
+    ${tinaja ? `<h2 class="titulo-seccion" style="margin-top:26px">Tinaja</h2>${tinaja}` : ""}`;
 }
 
 document.addEventListener("click", async (e) => {
@@ -3317,20 +3378,24 @@ document.addEventListener("click", async (e) => {
   if (!b) return;
   const cab = b.dataset.luz;
   const acc = b.dataset.acc;
+  const esTinaja = cab === "__tinaja";
 
   /* Apagarle la luz a una cabaña con gente dentro pregunta antes, y la pregunta
      dice a quien. El error tipico no es apretar sin querer: es apretar en la
      cabaña equivocada — el mismo motivo por el que el boton de Quitar salio de
      cada fila y se fue dentro de la ficha. */
-  if (acc === "off" && b.closest(".luz-fila")?.classList.contains("ocupada")
+  if (acc === "off" && b.closest(".luz-tarjeta")?.classList.contains("ocupada")
       && !confirm(`Hay huespedes en ${nombreCabana(cab)}. ¿Apagar sus luces igual?`)) return;
 
   const antes = b.textContent;
   b.disabled = true;
   b.textContent = "...";
   try {
-    await elLlamar("accion", { cabana: cab, accion: acc });
-    avisar(`${nombreCabana(cab)}: luces ${acc === "on" ? "encendidas" : "apagadas"}.`, "ok");
+    await elLlamar("accion",
+      esTinaja ? { rol: "tinaja", accion: acc } : { cabana: cab, accion: acc });
+    avisar(esTinaja
+      ? `Tinaja ${acc === "on" ? "encendida" : "apagada"}.`
+      : `${nombreCabana(cab)}: luces ${acc === "on" ? "encendidas" : "apagadas"}.`, "ok");
   } catch (err) {
     avisar(err.message, "error");
   }
@@ -3468,10 +3533,11 @@ document.querySelectorAll("nav.tabs button").forEach((b) => {
   b.addEventListener("click", () => {
     document.querySelectorAll("nav.tabs button")
       .forEach((x) => x.setAttribute("aria-selected", String(x === b)));
-    ["calendario", "huespedes", "aseos", "finanzas", "tarifas", "avisos"].forEach((v) => {
+    ["calendario", "huespedes", "luces", "aseos", "finanzas", "tarifas", "avisos"].forEach((v) => {
       $(`#vista-${v}`).hidden = v !== b.dataset.vista;
     });
     if (b.dataset.vista === "huespedes") pintarHuespedes();
+    if (b.dataset.vista === "luces")     pintarLuces();
     if (b.dataset.vista === "avisos")    pintarAvisos();
     if (b.dataset.vista === "tarifas")  pintarTarifas();
     if (b.dataset.vista === "aseos")    pintarAseos();
@@ -3515,8 +3581,10 @@ async function iniciar() {
     pintarHoy();
     pintarTarifas();
     /* Sin `await`: si la funcion de eWeLink tarda o esta caida, el panel tiene
-       que abrir igual. Las luces son un extra; la agenda es el trabajo. */
-    pintarLuces();
+       que abrir igual. Las luces son un extra; la agenda es el trabajo.
+       Y solo el estado, no la pantalla: esa se pinta al entrar en su pestaña,
+       igual que las demas. */
+    elCargarEstado();
 
     $("#sub-header").textContent =
       `Base ${clp(st.tarifaBase.precio_base)} - minimo ${st.reglas.minimo_noches} noches`;
