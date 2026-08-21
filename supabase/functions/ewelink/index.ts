@@ -314,15 +314,20 @@ async function dispositivos() {
      Nevados o El Chueco no lo puede adivinar nadie sin arriesgarse a encender
      la equivocada—, pero sirven para reconocerlas de un vistazo. */
   let salas: Record<string, string> = {};
+  let hogares: Record<string, string> = {};
   try {
     const fam = await ewelink('/v2/family');
-    for (const f of fam?.familyList ?? [])
+    for (const f of fam?.familyList ?? []) {
+      hogares[f.id] = f.name;
       for (const r of f.roomList ?? []) salas[r.id] = r.name;
+    }
+    console.log('salas de eWeLink:', JSON.stringify(salas));
   } catch (e) {
     /* Sin salas la lista sigue sirviendo, solo cuesta mas leerla. No vale la
        pena tumbar el listado entero por esto. */
     console.error('familias:', (e as Error).message);
     salas = {};
+    hogares = {};
   }
 
   const d = await ewelink('/v2/device/thing?num=0');
@@ -334,7 +339,16 @@ async function dispositivos() {
   const filas = [];
 
   for (const dev of lista) {
-    const sala = salas[dev.roomid as string] ?? null;
+    /* El id de la sala NO viene suelto en el aparato: viaja dentro de `family`,
+       junto al del hogar. Buscarlo en `dev.roomid` devuelve undefined y deja
+       todas las salas en blanco, que es exactamente lo que pasaba.
+       Se prueban las dos formas porque la documentacion no lo dice y lo unico
+       que hay es la respuesta real; y si no hay sala, al menos queda el nombre
+       del hogar, que ya distingue lo de las cabañas de lo de la veterinaria. */
+    const fam = (dev.family ?? {}) as { roomid?: string; familyid?: string };
+    const sala = salas[fam.roomid ?? ''] ??
+                 salas[(dev.roomid as string) ?? ''] ??
+                 hogares[fam.familyid ?? ''] ?? null;
     const uiid = (dev.extra as { uiid?: number } | undefined)?.uiid ?? null;
     const base = {
       device_id: dev.deviceid,
