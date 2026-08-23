@@ -1239,19 +1239,22 @@ nav.tabs button[aria-selected="true"] { color: var(--timbre); box-shadow: inset 
 .lz-marco {
   position: relative;
   width: 100%;
-  /* Lo que queda de pantalla entre la cabecera y las pestañas. La proporción ya
-     no importa aquí: las posiciones de los edificios se corrigen en `luces.js`
-     contra la del diseño, así que el terreno sale igual sea cual sea la forma
-     del marco. */
-  height: calc(100dvh - 138px);
+  /* Toda la pantalla menos la barra de pestañas. En Luces la cabecera se
+     esconde (ver abajo): el precio base y el mínimo de noches no ayudan a
+     decidir qué luz encender, y esos 76px son terreno. La proporción no importa
+     aquí — las posiciones se corrigen en `luces.js` contra la del diseño. */
+  height: calc(100dvh - var(--toque) - env(safe-area-inset-bottom) - 1px);
   min-height: 380px;
   overflow: hidden;
-  /* Sin esquinas ni bordes laterales: pegado a los lados no hay dónde ponerlos,
-     y las rayas de arriba y abajo bastan para separarlo de la cabecera. */
-  border-top: 1px solid var(--raya);
-  border-bottom: 1px solid var(--raya);
   background: var(--papel);
 }
+
+/* En Luces desaparece todo lo que no sea el mapa y las pestañas. Es la única
+   pantalla del panel donde lo de alrededor no aporta nada: no se viene aquí a
+   consultar un precio, se viene a ver el complejo y a tocar una luz.
+   Las pestañas se quedan porque son la forma de salir. */
+body.en-luces header { display: none; }
+body.en-luces main   { padding: 0; max-width: none; }
 
 /* Una tarjeta por cabaña. Los botones van ANCHOS y debajo del nombre, no
    apretados a la derecha: se usa de pie, con una mano y a veces con guantes. */

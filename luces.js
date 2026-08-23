@@ -286,12 +286,17 @@ function lzValores() {
       techo: (esPP || b.bodega)
         ? `position:absolute;inset:0;background:url('${b.pool ? (c ? 'luces/pool-on.png' : 'luces/pool-gris.png') : b.pump ? (c ? 'luces/sala-on.png' : 'luces/sala-gris.png') : (c ? 'luces/bodega-on2.png' : 'luces/bodega-gris2.png')}') center/100% 100% no-repeat;transition:filter .3s;filter:${halo}drop-shadow(0 2px 4px rgba(30,30,30,0.25));`
         : `position:absolute;inset:0;border-radius:2px;background:${techo};${forma}transition:filter .3s;filter:${halo}drop-shadow(0 2px 4px rgba(30,30,30,0.3));`,
+      /* Los nombres, pegados a su edificio y pequeños.
+         Sueltos y separados se cruzaban entre ellos —"SHANGRI-LA" encima de la
+         piscina, "PISCINA" encima de la sala de bombas— y un nombre que se
+         solapa con otro no identifica nada: hay que mirar a cuál de los dos
+         apunta. Cerca del edificio no hace falta preguntárselo. */
       label: (b.bodega
-        ? 'position:absolute;bottom:calc(100% + 7px);left:50%;transform:translateX(-50%);'
-        : b.pump ? 'position:absolute;right:calc(100% + 6px);top:50%;transform:translateY(-50%) rotate(180deg);writing-mode:vertical-rl;'
-        : b.pool ? 'position:absolute;top:calc(100% + 7px);left:50%;transform:translateX(-50%);'
-        : `position:absolute;top:calc(100% + ${b.rot ? 12 : 34}%);left:50%;transform:translateX(-50%);`)
-        + `display:${nombres?'block':'none'};font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#565B54;white-space:nowrap;font-weight:600;opacity:${S.open?0:1};transition:opacity .25s;`,
+        ? 'position:absolute;bottom:calc(100% + 2px);left:50%;transform:translateX(-50%);'
+        : b.pump ? 'position:absolute;right:calc(100% + 2px);top:50%;transform:translateY(-50%) rotate(180deg);writing-mode:vertical-rl;'
+        : b.pool ? 'position:absolute;top:calc(100% + 2px);left:50%;transform:translateX(-50%);'
+        : `position:absolute;top:calc(100% + ${b.rot ? 4 : 8}%);left:50%;transform:translateX(-50%);`)
+        + `display:${nombres?'block':'none'};font-size:8px;letter-spacing:0.06em;text-transform:uppercase;color:#565B54;white-space:nowrap;font-weight:700;opacity:${S.open?0:1};transition:opacity .25s;`,
       badgeFx: `position:absolute;top:-9px;right:-9px;z-index:3;min-width:19px;height:19px;border-radius:10px;background:#17414F;color:#F7F6F0;font-size:11px;font-weight:700;display:${c && contar ? 'flex' : 'none'};align-items:center;justify-content:center;padding:0 5px;box-shadow:0 2px 8px rgba(23,65,79,0.4);opacity:${S.open?0:1};transition:opacity .25s;`,
     };
   });

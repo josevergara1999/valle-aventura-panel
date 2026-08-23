@@ -3523,6 +3523,12 @@ document.querySelectorAll("nav.tabs button").forEach((b) => {
     ["calendario", "huespedes", "luces", "aseos", "finanzas", "tarifas", "avisos"].forEach((v) => {
       $(`#vista-${v}`).hidden = v !== b.dataset.vista;
     });
+    /* En Luces se esconde la cabecera. Es la unica pantalla donde lo de
+       alrededor no aporta: el precio base y el minimo de noches no ayudan a
+       decidir que luz encender, y esos pixeles son terreno del mapa. Se marca
+       ANTES de pintar para que el mapa se mida ya con su tamanio final. */
+    document.body.classList.toggle("en-luces", b.dataset.vista === "luces");
+
     if (b.dataset.vista === "huespedes") pintarHuespedes();
     if (b.dataset.vista === "luces")     pintarLuces();
     if (b.dataset.vista === "avisos")    pintarAvisos();
