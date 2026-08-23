@@ -297,7 +297,10 @@ function lzValores() {
          apunta. Cerca del edificio no hace falta preguntárselo. */
       label: (b.bodega
         ? 'position:absolute;bottom:calc(100% + 2px);left:50%;transform:translateX(-50%);'
-        : b.pump ? 'position:absolute;right:calc(100% + 2px);top:50%;transform:translateY(-50%) rotate(180deg);writing-mode:vertical-rl;'
+        /* La sala de bombas llevaba el nombre en vertical y a su izquierda, y
+           por ahí es por donde sube justo hasta "PISCINA": dos rótulos que se
+           cruzan en ángulo recto son los peores de leer. Debajo, como todos. */
+        : b.pump ? 'position:absolute;top:calc(100% + 2px);left:50%;transform:translateX(-50%);'
         : b.pool ? 'position:absolute;top:calc(100% + 2px);left:50%;transform:translateX(-50%);'
         : `position:absolute;top:calc(100% + ${b.rot ? 4 : 8}%);left:50%;transform:translateX(-50%);`)
         + `display:${nombres?'block':'none'};font-size:8px;letter-spacing:0.06em;text-transform:uppercase;color:#565B54;white-space:nowrap;font-weight:700;opacity:${S.open?0:1};transition:opacity .25s;`,
@@ -410,19 +413,19 @@ function lzMontar(caja) {
       <div class="lz-marco" id="lz-marco">
         <button type="button" id="lz-master" style="${v.masterFx}">Apagar todo · <span id="lz-total">${v.total}</span></button>
         <div id="lz-plano" style="position:absolute;inset:0;touch-action:none;${v.planeFx}">
+          <!-- La cuadrícula de puntos se queda: es el papel sobre el que están
+               los edificios, no una línea que cruce por encima de nada. -->
           <div style="position:absolute;inset:-150%;background-color:#FFFFFF;background-image:radial-gradient(circle, rgba(20,61,74,0.16) 1px, transparent 1.4px);background-size:18px 18px"></div>
-          <div style="position:absolute;inset:3%;border:1.2px dashed #B7BBAE;border-radius:8px"></div>
-          <div style="position:absolute;left:0;right:0;bottom:0;height:5.5%;background:#E9E7E1;border-top:1px dashed #C2C0B8">
-            <div style="position:absolute;left:0;right:0;top:48%;border-top:2px dashed #D2D0C8"></div>
-            <div style="position:absolute;right:2.5%;top:12%;font-size:8px;letter-spacing:0.3em;color:#A5A399;font-weight:600">RUTA</div>
-          </div>
+
+          <!-- Aquí vivían el marco de puntos, la franja de RUTA y la escala de
+               100 m. Fuera los tres: en un mapa que se mira para encender una
+               luz, un límite dibujado corta el terreno en dos y una escala
+               responde a una pregunta que nadie se hace. Lo que queda es lo
+               único que se toca. -->
+
           <div style="position:absolute;top:4.5%;right:4.5%;display:flex;flex-direction:column;align-items:center;gap:2px">
             <div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:8px solid #7B8187"></div>
             <div style="font-size:10px;font-weight:700;color:#7B8187">N</div>
-          </div>
-          <div style="position:absolute;left:4.5%;bottom:8%;display:flex;align-items:center;gap:6px">
-            <div style="width:15%;min-width:52px;height:1.5px;background:#9A9E96"></div>
-            <div style="font-size:9px;color:#7B8187;font-weight:600">100 m</div>
           </div>
           ${edificiosHTML}
         </div>
