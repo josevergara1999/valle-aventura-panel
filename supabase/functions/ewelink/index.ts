@@ -393,6 +393,48 @@ async function dispositivos() {
   return await sb('dispositivos?select=*&order=sala.asc.nullslast,nombre.asc');
 }
 
+/* El estado real de cada ambiente del mapa.
+ *
+ * Se lee de eWeLink cada vez y NO se guarda en ninguna parte. El plano enseña
+ * qué está encendido, y esa es justamente la información que no se puede
+ * cachear: el huésped apaga desde el interruptor de la pared cuando quiere, y
+ * un plano que dice "encendido" sobre una luz apagada es peor que no tener
+ * plano.
+ *
+ * Es UNA llamada para todo: el listado de aparatos ya trae los `params` con el
+ * on/off de cada canal, así que no hace falta preguntar aparato por aparato.
+ *
+ * Lo que no se sabe se dice: un aparato fuera de línea no vuelve como apagado,
+ * vuelve en `fuera`. Apagado y sin señal no son lo mismo y la pantalla los
+ * pinta distinto. */
+async function estado() {
+  const d = await ewelink('/v2/device/thing?num=0');
+  const params: Record<string, Record<string, unknown>> = {};
+  const enLinea: Record<string, boolean> = {};
+  for (const t of d?.thingList ?? []) {
+    if (t.itemType !== 1) continue;
+    params[t.itemData.deviceid] = (t.itemData.params ?? {}) as Record<string, unknown>;
+    enLinea[t.itemData.deviceid] = t.itemData.online === true;
+  }
+
+  const filas = await sb('dispositivos?zona=not.is.null&clave=not.is.null&activo=is.true'
+                       + '&select=zona,clave,device_id,canal');
+
+  const luces: Record<string, boolean> = {};
+  const fuera: string[] = [];
+  for (const f of filas ?? []) {
+    const k = `${f.zona}:${f.clave}`;
+    const p = params[f.device_id];
+    if (!p || !enLinea[f.device_id]) { fuera.push(k); continue; }
+    const sw = p.switches as Array<{ switch?: string }> | undefined;
+    const v = (f.canal === null || f.canal === undefined)
+      ? p.switch
+      : (Array.isArray(sw) ? sw[f.canal]?.switch : undefined);
+    luces[k] = v === 'on';
+  }
+  return { luces, fuera };
+}
+
 /* Encender o apagar ahora, desde el panel. A diferencia de /cron, esto SÍ
    recibe qué y a qué, y por eso exige sesión. */
 async function accion(body: { dispositivo?: string; cabana?: string; rol?: string; accion: string }) {
@@ -400,7 +442,12 @@ async function accion(body: { dispositivo?: string; cabana?: string; rol?: strin
 
   let filtro = '';
   if (body.dispositivo) filtro = `id=eq.${body.dispositivo}`;
-  else if (body.rol === 'tinaja') filtro = 'tipo=eq.tinaja';
+  /* Un ambiente concreto del mapa: el Living de Nevados y no "las luces de
+     Nevados". Es lo que pide el plano, donde se toca una habitación. */
+  else if (body.zona && body.clave) {
+    filtro = `zona=eq.${encodeURIComponent(body.zona)}&clave=eq.${encodeURIComponent(body.clave)}`;
+  } else if (body.rol === 'tinaja') filtro = 'tipo=eq.tinaja';
+  else if (body.zona) filtro = `zona=eq.${encodeURIComponent(body.zona)}`;
   else if (body.cabana) filtro = `cabana_id=eq.${body.cabana}&tipo=eq.luz`;
   else throw new Error('Falta decir qué aparato.');
 
@@ -478,6 +525,7 @@ Deno.serve(async (req) => {
 
     if (ruta === 'preparar')     return json(await preparar());
     if (ruta === 'dispositivos') return json(await dispositivos());
+    if (ruta === 'estado')       return json(await estado());
     if (ruta === 'accion')       return json(await accion(await req.json()));
 
     return json({ error: 'Ruta desconocida.' }, 404);

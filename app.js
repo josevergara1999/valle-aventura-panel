@@ -3291,11 +3291,10 @@ const diaLocal = (iso) =>
 async function pintarLuces() {
   const caja = $("#vista-luces");
   if (!caja) return;
-  caja.innerHTML = '<h2 class="titulo-seccion">Luces</h2>'
-    + '<p class="lista-vacia">Cargando...</p>';
-
   await elCargarEstado();
+
   if (!el.estado?.conectado) {
+    LZ.refs = null;
     caja.innerHTML = `<h2 class="titulo-seccion">Luces</h2>
       <div class="tarjeta"><p class="lista-vacia">
         eWeLink no esta conectado. Ve a <b>Avisos</b> y toca <b>Conectar</b>.
@@ -3303,74 +3302,50 @@ async function pintarLuces() {
     return;
   }
 
-  /* Se piden las cabañas aparte y no se usa `st.cabanas`: ahi solo estan las
-     que se arriendan, y la casa del host tambien tiene luces que encender. */
-  let cabs = st.cabanas;
-  let luces = [];
+  /* El mapa va en su propio contenedor y la tinaja debajo, fuera de el: el mapa
+     es el diseno tal cual y no se le mete nada dentro. La tinaja no es una luz
+     ni sale en el plano, pero hay noches que se usa sin turno y el boton tiene
+     que estar en alguna parte. */
+  if (!caja.querySelector("#lz-host")) {
+    caja.innerHTML = '<div id="lz-host"></div><div id="lz-tinaja"></div>';
+    LZ.refs = null;
+  }
+
+  if (!LZ.refs) lzMontar(caja.querySelector("#lz-host"));
+  try {
+    await lzCargarEstado();
+  } catch (e) {
+    avisar("No se pudo leer el estado de las luces: " + e.message, "error");
+  }
+  lzMedir();
+  lzPintar();
+  await pintarTinaja(caja.querySelector("#lz-tinaja"));
+}
+
+/* La tinaja, debajo del mapa. No es una luz y no sale en el plano, pero dice a
+   que hora se enciende sola — que es lo que evita subir a encenderla "por si
+   acaso" y dejarla ocho horas. */
+async function pintarTinaja(caja) {
+  if (!caja || !el.hayTinaja) { if (caja) caja.innerHTML = ""; return; }
   let prox = null;
   try {
-    [cabs, luces] = await Promise.all([
-      api("cabanas?select=id,nombre,orden&order=orden"),
-      api("dispositivos?tipo=eq.luz&activo=is.true&select=cabana_id,en_linea"),
-    ]);
-    /* El proximo encendido de tinaja que hay programado. Se enseña aunque haya
-       botones: saber que se enciende sola a las 17:00 es lo que evita subir a
-       encenderla "por si acaso" y dejarla ocho horas. */
     prox = (await api("ewelink_ordenes?rol=eq.tinaja&accion=eq.on&estado=eq.pendiente"
                     + "&select=momento&order=momento.asc&limit=1"))?.[0] || null;
-  } catch (e) { /* se pinta con lo que haya */ }
-
-  const porCabana = new Map();
-  (luces || []).forEach((l) => {
-    if (!l.cabana_id) return;
-    if (!porCabana.has(l.cabana_id)) porCabana.set(l.cabana_id, []);
-    porCabana.get(l.cabana_id).push(l);
-  });
-
-  const hoy = hoyISO();
-  const ocupadas = new Set(
-    st.hoy.filter((b) => b.desde <= hoy && b.hasta > hoy).map((b) => b.cabana_id));
-
-  const tarjeta = (titulo, sub, clave, ocupada) => `
-    <div class="tarjeta luz-tarjeta${ocupada ? " ocupada" : ""}">
+  } catch (e) { /* sin turno a la vista, se dice igual */ }
+  caja.innerHTML = `
+    <h2 class="titulo-seccion" style="margin-top:22px">Tinaja</h2>
+    <div class="tarjeta luz-tarjeta">
       <div class="luz-cab">
-        <b>${esc(titulo)}</b>
-        <span class="luz-nota">${sub}</span>
+        <b>Tinaja</b>
+        <span class="luz-nota">${prox
+          ? "se enciende sola el " + diaLocal(prox.momento) + " a las " + horaLocal(prox.momento)
+          : "sin turno programado"}</span>
       </div>
       <div class="fila">
-        <button type="button" class="secundario" data-luz="${clave}" data-acc="off">Apagar</button>
-        <button type="button" data-luz="${clave}" data-acc="on">Encender</button>
+        <button type="button" class="secundario" data-luz="__tinaja" data-acc="off">Apagar</button>
+        <button type="button" data-luz="__tinaja" data-acc="on">Encender</button>
       </div>
     </div>`;
-
-  const conLuces = (cabs || []).filter((c) => porCabana.has(c.id));
-
-  const cuerpo = conLuces.map((c) => {
-    const ls = porCabana.get(c.id);
-    const fuera = ls.filter((l) => l.en_linea === false).length;
-    const sub = [
-      `${ls.length} ${ls.length === 1 ? "luz" : "luces"}`,
-      ocupadas.has(c.id) ? "con huespedes" : null,
-      /* Que un aparato no responda se dice ANTES de tocar el boton. Si no, se
-         aprieta, no pasa nada, y no hay forma de saber si fallo el panel o es
-         que esa luz lleva dos dias sin señal. */
-      fuera ? `${fuera} sin responder` : null,
-    ].filter(Boolean).join(" &middot; ");
-    return tarjeta(c.nombre, sub, c.id, ocupadas.has(c.id));
-  }).join("");
-
-  const tinaja = el.hayTinaja
-    ? tarjeta("Tinaja",
-        prox ? `se enciende sola el ${diaLocal(prox.momento)} a las ${horaLocal(prox.momento)}`
-             : "sin turno programado",
-        "__tinaja", false)
-    : "";
-
-  caja.innerHTML = `<h2 class="titulo-seccion">Luces</h2>
-    ${cuerpo || `<div class="tarjeta"><p class="lista-vacia">
-      Ninguna luz esta asignada a una cabaña todavia. Se etiquetan en
-      <b>Avisos</b>, abajo del todo.</p></div>`}
-    ${tinaja ? `<h2 class="titulo-seccion" style="margin-top:26px">Tinaja</h2>${tinaja}` : ""}`;
 }
 
 document.addEventListener("click", async (e) => {

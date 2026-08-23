@@ -1224,6 +1224,26 @@ nav.tabs button[aria-selected="true"] { color: var(--timbre); box-shadow: inset 
 /* ── eWeLink: luces y aparatos ──────────────────────────────────────────────
    Sin colores nuevos. Todo sale de tokens.css, así que cambiar la identidad
    del panel sigue siendo tocar un archivo. */
+/* ── El mapa del complejo ────────────────────────────────────────────────────
+   Solo la caja. Todo lo de dentro lleva sus estilos en línea porque viene del
+   diseño de Claude Design y se porta tal cual — si algo de ahí se reescribiera
+   aquí, habría dos sitios donde mirar cuando el mapa se vea raro. */
+.lz-todo { display: flex; justify-content: center; }
+.lz-marco {
+  position: relative;
+  width: 100%;
+  /* El alto de la pantalla menos la cabecera y la barra de pestañas. El mapa se
+     mira entero de un vistazo: recortarlo obligaría a desplazarse para ver si
+     quedó algo encendido en la piscina, que es justo lo que se viene a mirar. */
+  height: calc(100dvh - 205px);
+  min-height: 400px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--raya-fuerte);
+  box-shadow: var(--sombra-hoja);
+  background: var(--papel);
+}
+
 /* Una tarjeta por cabaña. Los botones van ANCHOS y debajo del nombre, no
    apretados a la derecha: se usa de pie, con una mano y a veces con guantes. */
 .luz-tarjeta .luz-cab { margin-bottom: var(--e3); }

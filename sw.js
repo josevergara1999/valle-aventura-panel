@@ -10,7 +10,7 @@
 const CACHE = "valle-panel-v1";
 const SHELL = [
   "./index.html", "./tokens.css", "./styles.css", "./app.js",
-  "./config.js", "./manifest.webmanifest",
+  "./luces.js", "./config.js", "./manifest.webmanifest",
 ];
 
 self.addEventListener("install", (e) => {
