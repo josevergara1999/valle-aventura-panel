@@ -120,6 +120,13 @@ const LZ_GRUPOS = {
   ],
 };
 
+/* Escapa aquí y no reutilizando el de `app.js`. Es una línea, y a cambio este
+   archivo deja de depender del orden en que se carguen los dos: `app.js` vive
+   entero dentro de una función anónima, así que lo suyo no es global y una sola
+   referencia rota deja el panel en blanco sin decir por qué. */
+const lzEsc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
 const lzGrupos = (b) => LZ_GRUPOS[b.id] || [];
 const lzAmbientes = (b) => {
   const vistos = new Set(), out = [];
@@ -487,7 +494,28 @@ function lzPintar() {
    edificio, y ahí no hay ninguna transición que preservar. */
 function lzPintarPanel(v) {
   if (!LZ.refs) return;
+  try {
+    lzPintarPanelInterno(v);
+  } catch (e) {
+    /* Un panel en blanco no dice nada y obliga a adivinar desde fuera con
+       capturas de pantalla. Si esto revienta, que lo diga en el sitio donde
+       debería haber botones — es donde se está mirando. */
+    LZ.refs.panel.innerHTML =
+      '<div style="background:#F4F3EC;border:1px solid #B0453C;border-radius:12px;'
+      + 'padding:12px 14px;font-size:12px;color:#B0453C;word-break:break-word">'
+      + '<b>No se pudo pintar el panel</b><br>' + lzEsc(e.message) + '</div>';
+  }
+}
+
+function lzPintarPanelInterno(v) {
   v = v || lzValores();
+  if (!v.grupos.length) {
+    LZ.refs.panel.innerHTML =
+      '<div style="background:#F4F3EC;border:1px solid #DAD9D0;border-radius:12px;'
+      + 'padding:12px 14px;font-size:12px;color:#6A6E67">Este edificio no tiene '
+      + 'interruptores asignados (' + lzEsc(LZ.st.sel) + ').</div>';
+    return;
+  }
   LZ.refs.panel.innerHTML = v.grupos.map((gp) => `
     <div style="background:#F4F3EC;border:1px solid #DAD9D0;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:12px;flex:none">
       <div style="display:flex;align-items:center;gap:10px">
@@ -495,7 +523,7 @@ function lzPintarPanel(v) {
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${gp.icon}"></path></svg>
         </div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:13.5px;font-weight:700;color:#1C1C1E">${VA_PANEL.esc(gp.name)}</div>
+          <div style="font-size:13.5px;font-weight:700;color:#1C1C1E">${lzEsc(gp.name)}</div>
           <div style="font-size:10.5px;color:#6A6E67">${gp.sub}</div>
         </div>
       </div>
