@@ -1228,25 +1228,28 @@ nav.tabs button[aria-selected="true"] { color: var(--timbre); box-shadow: inset 
    Solo la caja. Todo lo de dentro lleva sus estilos en línea porque viene del
    diseño de Claude Design y se porta tal cual — si algo de ahí se reescribiera
    aquí, habría dos sitios donde mirar cuando el mapa se vea raro. */
-.lz-todo { display: flex; justify-content: center; }
+/* De borde a borde. `main` tiene relleno y un ancho máximo —bien para listas y
+   fichas, estorbo para un mapa— así que esto se sale de ahí a lo ancho de la
+   ventana. Cada píxel de margen es terreno que no se ve. */
+.lz-todo {
+  width: 100vw;
+  margin-left: 50%;
+  transform: translateX(-50%);
+}
 .lz-marco {
   position: relative;
-  /* La PROPORCIÓN es lo que hay que respetar, no el ancho.
-     Las posiciones de los edificios van en porcentaje —la x del ancho, la y del
-     alto— así que en un marco más achatado que el del diseño los edificios se
-     juntan verticalmente y el mapa deja de parecerse al terreno. Por eso se fija
-     el alto a lo que queda de pantalla y el ancho SALE de la proporción, aunque
-     sobre un poco de margen a los lados. Un mapa estrecho y bien proporcionado
-     sirve; uno ancho y aplastado, no. */
-  height: calc(100dvh - 150px);
-  aspect-ratio: 390 / 844;
-  width: auto;
-  max-width: 100%;
-  min-height: 400px;
-  border-radius: 16px;
+  width: 100%;
+  /* Lo que queda de pantalla entre la cabecera y las pestañas. La proporción ya
+     no importa aquí: las posiciones de los edificios se corrigen en `luces.js`
+     contra la del diseño, así que el terreno sale igual sea cual sea la forma
+     del marco. */
+  height: calc(100dvh - 138px);
+  min-height: 380px;
   overflow: hidden;
-  border: 1px solid var(--raya-fuerte);
-  box-shadow: var(--sombra-hoja);
+  /* Sin esquinas ni bordes laterales: pegado a los lados no hay dónde ponerlos,
+     y las rayas de arriba y abajo bastan para separarlo de la cabecera. */
+  border-top: 1px solid var(--raya);
+  border-bottom: 1px solid var(--raya);
   background: var(--papel);
 }
 

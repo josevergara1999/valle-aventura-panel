@@ -32,6 +32,10 @@
      apagado no son lo mismo.
    ========================================================================== */
 
+/* La proporción del diseño: un teléfono de pie. Es la referencia contra la que
+   se corrigen las posiciones cuando el mapa se pinta en un marco de otra forma. */
+const LZ_PROP = 390 / 844;
+
 const LZ = {
   props: {
     velocidad: 1, zoomNivel: 6.5, zoomAncho: 118, brillo: 1.3, azulPiscina: 60,
@@ -200,9 +204,19 @@ function lzValores() {
   const g = P.brillo, azul = P.azulPiscina / 100, Z = P.zoomNivel, v = P.velocidad;
   const techos = P.verTechos, nombres = P.verNombres, contar = P.contadores;
 
+  /* Las `y` del diseño van en porcentaje del ALTO, y el diseño era un teléfono
+     de pie. En un marco de otra forma ese mismo porcentaje cae en otro sitio del
+     terreno: los edificios se juntan o se separan según lo achatado que esté.
+
+     Se convierte para que la distancia entre edificios siga valiendo lo mismo
+     respecto al ANCHO, que es lo único que no cambia. Con esto el mapa puede
+     ocupar la pantalla entera, sin bordes y sea cual sea el teléfono, y seguir
+     siendo el mismo terreno. Las x y los tamaños no se tocan: ya van en
+     porcentaje del ancho. */
+  const ky = (S.pa || LZ_PROP) / LZ_PROP;
   const BS = LZ.edificios.map((b) => {
     const p = LZ.pos[b.id], w = p.t;
-    return Object.assign({}, b, { x: p.x, y: p.y, w, h: b.h * (w / b.w) });
+    return Object.assign({}, b, { x: p.x, y: p.y * ky, w, h: b.h * (w / b.w) });
   });
   const selB = BS.find((b) => b.id === S.sel) || BS[1];
   const encendida = (id, k) => !!(S.luces[id] && S.luces[id][k]);
