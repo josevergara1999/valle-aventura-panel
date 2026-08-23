@@ -34,7 +34,7 @@
 
 const LZ = {
   props: {
-    velocidad: 1, zoomNivel: 6.5, brillo: 1.3, azulPiscina: 60,
+    velocidad: 1, zoomNivel: 6.5, zoomAncho: 118, brillo: 1.3, azulPiscina: 60,
     contadores: true, verTechos: false, verNombres: true,
   },
   /* Posiciones tal como quedaron en el diseño. En porcentaje del plano, que es
@@ -285,7 +285,21 @@ function lzValores() {
   const fh = esEstructura ? selB.h : selB.h / 0.73;
   const rot = (!esEstructura && selB.rot) || 0;
   const dw = rot ? fh : fw, dh = rot ? fw : fh;
-  const esc = Math.min(disponible / (S.pw * dh / 100), 92 / dw, selB.w < 10 ? 99 : Z);
+  /* Cuánto se amplía al tocar un edificio. Tres topes y manda el más pequeño:
+     lo que cabe de alto sin meterse debajo del panel, lo que cabe de ancho, y
+     el tope duro de `zoomNivel`.
+
+     `zoomAncho` es el porcentaje del mapa que puede llegar a ocupar el edificio.
+     El diseño traía 92 y se quedaba corto: en un teléfono el plano salía a media
+     pantalla y había que hacer pinza para leer los ambientes, que es justo lo
+     que la vista con zoom viene a evitar. Es el número a tocar si se quiere más
+     o menos grande — no hay que entender el resto de la cuenta para moverlo.
+
+     Se llama `escala` y no `esc` a propósito: `esc` es la función que escapa
+     HTML, y tenerlas con el mismo nombre es una trampa esperando. */
+  const escala = Math.min(disponible / (S.pw * dh / 100),
+                          P.zoomAncho / dw,
+                          selB.w < 10 ? 99 : Z);
   const cyT = ((74 + panelTop) / 2) / ph * 100;
   let ox = esEstructura ? 0 : 0.055 * fw, oy = esEstructura ? 0 : 0.085 * fh;
   if (rot === 90) { const t = ox; ox = -oy; oy = t; }
@@ -294,7 +308,7 @@ function lzValores() {
   const dur = (0.8/v).toFixed(2), dl = (0.25/v).toFixed(2);
 
   const planeFx = S.open
-    ? `transform:translate(${(50-cx).toFixed(2)}%, ${(cyT-cy).toFixed(2)}%) scale(${esc.toFixed(2)});transform-origin:${cx}% ${cy}%;transition:transform ${dur}s cubic-bezier(.55,.06,.28,.99);cursor:default;`
+    ? `transform:translate(${(50-cx).toFixed(2)}%, ${(cyT-cy).toFixed(2)}%) scale(${escala.toFixed(2)});transform-origin:${cx}% ${cy}%;transition:transform ${dur}s cubic-bezier(.55,.06,.28,.99);cursor:default;`
     : `transform:translate(${S.ux.toFixed(1)}px, ${S.uy.toFixed(1)}px) scale(${S.uz.toFixed(3)});transform-origin:50% 50%;transition:${S.gest ? 'none' : `transform ${dur}s cubic-bezier(.55,.06,.28,.99)`};cursor:grab;`;
 
   const grupos = lzGrupos(selB).map((gp) => {
@@ -481,7 +495,7 @@ function lzPintarPanel(v) {
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${gp.icon}"></path></svg>
         </div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:13.5px;font-weight:700;color:#1C1C1E">${esc(gp.name)}</div>
+          <div style="font-size:13.5px;font-weight:700;color:#1C1C1E">${VA_PANEL.esc(gp.name)}</div>
           <div style="font-size:10.5px;color:#6A6E67">${gp.sub}</div>
         </div>
       </div>
@@ -575,7 +589,7 @@ function lzGestos() {
 /* ── Los aparatos ────────────────────────────────────────────────────────── */
 async function lzCargarEstado() {
   try {
-    const d = await elLlamar('estado');
+    const d = await VA_PANEL.elLlamar('estado');
     const luces = {};
     LZ.edificios.forEach((b) => { luces[b.id] = {}; });
     Object.keys(d.luces || {}).forEach((k) => {
@@ -600,17 +614,17 @@ async function lzCargarEstado() {
 async function lzToggle(zona, clave) {
   const k = `${zona}:${clave}`;
   if (LZ.st.pend[k]) return;
-  if (LZ.st.fuera.has(k)) { avisar('Ese aparato no responde.', 'error'); return; }
+  if (LZ.st.fuera.has(k)) { VA_PANEL.avisar('Ese aparato no responde.', 'error'); return; }
 
   const actual = !!(LZ.st.luces[zona] && LZ.st.luces[zona][clave]);
   LZ.st.pend[k] = true;
   lzPintar();
   try {
-    await elLlamar('accion', { zona, clave, accion: actual ? 'off' : 'on' });
+    await VA_PANEL.elLlamar('accion', { zona, clave, accion: actual ? 'off' : 'on' });
     if (!LZ.st.luces[zona]) LZ.st.luces[zona] = {};
     LZ.st.luces[zona][clave] = !actual;
   } catch (e) {
-    avisar(e.message, 'error');
+    VA_PANEL.avisar(e.message, 'error');
     /* Si falló puede que el aparato se haya quedado a medias, así que no se
        supone nada: se vuelve a preguntar. */
     try { await lzCargarEstado(); } catch (e2) { /* ya está avisado */ }
@@ -627,13 +641,13 @@ async function lzVarios(pares, accion) {
   const fallos = [];
   for (const [z, c] of utiles) {
     try {
-      await elLlamar('accion', { zona: z, clave: c, accion });
+      await VA_PANEL.elLlamar('accion', { zona: z, clave: c, accion });
       if (!LZ.st.luces[z]) LZ.st.luces[z] = {};
       LZ.st.luces[z][c] = accion === 'on';
     } catch (e) { fallos.push(`${z}:${c}`); }
   }
   utiles.forEach(([z, c]) => { delete LZ.st.pend[`${z}:${c}`]; });
-  if (fallos.length) avisar(`${fallos.length} no respondieron.`, 'error');
+  if (fallos.length) VA_PANEL.avisar(`${fallos.length} no respondieron.`, 'error');
   lzPintar();
 }
 

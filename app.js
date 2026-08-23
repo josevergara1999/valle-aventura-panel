@@ -3270,6 +3270,18 @@ async function elLlamar(ruta, cuerpo) {
   return d;
 }
 
+/* El puente con `luces.js`.
+ *
+ * Todo este archivo vive dentro de una funcion anonima, asi que nada de aqui es
+ * global — y `luces.js` es otro archivo. Se le pasan las cuatro cosas que
+ * necesita, por nombre y a proposito, en vez de sacar el panel entero al ambito
+ * global: asi la superficie compartida se ve de un vistazo y no crece sola.
+ *
+ * Sin esto el mapa se pintaba pero el panel de abajo salia vacio: `esc` no
+ * existia para el, la excepcion cortaba el resto y ni siquiera se llegaba a
+ * leer que luces estaban encendidas. */
+window.VA_PANEL = { esc, avisar, api, elLlamar };
+
 async function elCargarEstado() {
   try {
     el.estado = await api("rpc/ewelink_estado", { method: "POST", body: "{}" });
