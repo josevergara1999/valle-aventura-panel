@@ -7,7 +7,7 @@
    —caché primero— el teléfono seguiría abriendo la versión vieja después de
    cada despliegue, que es exactamente el problema que ya apareció en Inmersia. */
 
-const CACHE = "valle-panel-v6";
+const CACHE = "valle-panel-v7";
 const SHELL = [
   "./index.html", "./tokens.css", "./styles.css", "./app.js",
   "./luces.js", "./config.js", "./manifest.webmanifest",
@@ -37,11 +37,34 @@ self.addEventListener("fetch", (e) => {
   // Todo lo que va a Supabase pasa directo, sin tocar la caché.
   if (e.request.method !== "GET" || url.origin !== self.location.origin) return;
 
+  /* Los planos del mapa: de la caché si están, y punto.
+     Son 19 MB que no cambian nunca, y pidiéndolos siempre a la red se comían el
+     ancho de banda que necesitaba el código. Con la señal del valle eso acababa
+     en lo peor posible: el `luces.js` recién desplegado no llegaba a tiempo, se
+     servía el viejo de la caché, y el panel se quedaba con una versión mezclada
+     sin decir nada. Cuando una imagen cambie de verdad, se sube la versión de
+     la caché y entran todas de nuevo. */
+  if (url.pathname.includes("/luces/")) {
+    e.respondWith((async () => {
+      const guardada = await caches.match(e.request);
+      if (guardada) return guardada;
+      const red = await fetch(e.request);
+      if (red && red.ok) (await caches.open(CACHE)).put(e.request, red.clone());
+      return red;
+    })());
+    return;
+  }
+
   e.respondWith((async () => {
     try {
+      /* 8 segundos y no 3. El tope existe para que el panel abra con mala señal,
+         no para servir código viejo a la primera de cambio: estos archivos pesan
+         kilobytes y lo que se juega es que la app sea la de ahora o la de hace
+         tres despliegues. Esperar cinco segundos más una vez sale más barato que
+         mirar una pantalla que no coincide con lo que se acaba de arreglar. */
       const red = await Promise.race([
         fetch(e.request),
-        new Promise((_, rechazar) => setTimeout(() => rechazar(new Error("lento")), 3000)),
+        new Promise((_, rechazar) => setTimeout(() => rechazar(new Error("lento")), 8000)),
       ]);
       if (red && red.ok) {
         const c = await caches.open(CACHE);

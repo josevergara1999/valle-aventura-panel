@@ -40,22 +40,26 @@ const LZ = {
   props: {
     velocidad: 1, zoomNivel: 6.5, zoomAncho: 118, brillo: 1.3, azulPiscina: 60,
     contadores: true, verTechos: false, verNombres: true,
+    /* Cuánto ocupan los edificios sobre el mapa, todos a la vez.
+       Achicar uno solo para que respire deja el mapa desparejo y el problema
+       reaparece en el siguiente rincón. Encogiéndolos a todos por igual, las
+       posiciones no se mueven y el hueco entre ellos crece en todas partes: es
+       agrandar el terreno, no empequeñecer una bodega.
+       Es el número para dar o quitar aire al mapa entero. */
+    tamano: 0.85,
   },
   /* Posiciones tal como quedaron en el diseño. En porcentaje del plano, que es
      lo que hace que el mapa aguante cualquier ancho de teléfono. */
   pos: {
-    /* La bodega ocupaba un 27.5% del ancho, con las cabañas en 18: era el
-       edificio más grande del mapa con diferencia, y no es el más importante.
-       Bajarla a 23.5 la separa de Host por los dos lados a la vez —encoge de
-       ancho y de alto, porque el alto sale del ancho— y de paso la deja en
-       proporción con lo demás.
+    /* Los tamaños son los del diseño; el aire lo da `tamano` de arriba, que los
+       encoge a todos por igual. Achicar solo la bodega la dejaba desparejada y
+       el apretón reaparecía en el siguiente rincón.
 
-       La x negativa aprovecha el lienzo transparente del PNG: lleva 67px vacíos
-       a la izquierda sobre 1448 de ancho, un 4.6% de su caja. Al encoger la
-       caja encoge también ese margen, así que el número baja con ella: 4.6% de
-       23.5 son 1.1 puntos. Con eso el dibujo toca el borde sin perder un píxel;
-       más allá se corta. */
-    bod:  { x: -1.1, y: 9,    t: 23.5 },
+       La x negativa aprovecha el lienzo transparente del PNG de la bodega: 67px
+       vacíos a la izquierda sobre 1448 de ancho, un 4.6% de su caja. Metiéndola
+       ese tanto, el dibujo toca el borde de la pantalla sin perder un píxel.
+       Más allá no hay margen y se corta. */
+    bod:  { x: -1.3, y: 9,    t: 27.5 },
     c1:   { x: 47,   y: 6,    t: 18   },
     c2:   { x: 19,   y: 20,   t: 18   },
     c3:   { x: 72,   y: 23,   t: 18   },
@@ -226,7 +230,10 @@ function lzValores() {
      porcentaje del ancho. */
   const ky = (S.pa || LZ_PROP) / LZ_PROP;
   const BS = LZ.edificios.map((b) => {
-    const p = LZ.pos[b.id], w = p.t;
+    /* El alto sale del ancho, así que `tamano` los encoge a los dos y el
+       edificio se aleja de sus vecinos por los cuatro costados. Las posiciones
+       no se tocan: por eso el hueco crece sin que nada se mueva de sitio. */
+    const p = LZ.pos[b.id], w = p.t * P.tamano;
     return Object.assign({}, b, { x: p.x, y: p.y * ky, w, h: b.h * (w / b.w) });
   });
   const selB = BS.find((b) => b.id === S.sel) || BS[1];
