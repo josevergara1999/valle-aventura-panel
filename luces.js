@@ -44,11 +44,12 @@ const LZ = {
   /* Posiciones tal como quedaron en el diseño. En porcentaje del plano, que es
      lo que hace que el mapa aguante cualquier ancho de teléfono. */
   pos: {
-    /* La bodega ya estaba pegada al borde izquierdo (x:1), así que lo que la
-       tenía encima de Host era la altura y no el lado. Se le da el 1% que
-       quedaba y se sube: separarlas en diagonal cuesta menos que mover Host,
-       que está donde tiene que estar. */
-    bod:  { x: 0,    y: 9,    t: 27.5 },
+    /* -1.3 y no 0: el PNG de la bodega lleva 67px de lienzo transparente a la
+       izquierda sobre 1448 de ancho, o sea un 4.6% de su propia caja, que sobre
+       el mapa son 1.3 puntos. Metiéndola ese tanto, el dibujo queda tocando el
+       borde de la pantalla sin perder un píxel. Más allá ya no hay margen que
+       aprovechar: se corta la bodega. */
+    bod:  { x: -1.3, y: 9,    t: 27.5 },
     c1:   { x: 47,   y: 6,    t: 18   },
     c2:   { x: 19,   y: 20,   t: 18   },
     c3:   { x: 72,   y: 23,   t: 18   },
