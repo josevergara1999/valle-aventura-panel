@@ -36,6 +36,28 @@
    se corrigen las posiciones cuando el mapa se pinta en un marco de otra forma. */
 const LZ_PROP = 390 / 844;
 
+/* Se enseña en una esquina del mapa. Parece una tontería y no lo es: sin esto,
+   "sigo viendo lo de antes" y "no se subió el cambio" son indistinguibles desde
+   fuera, y se pierde media hora adivinando cuál de los dos es. */
+const LZ_VER = 8;
+
+/* ── Posiciones movidas a mano ─────────────────────────────────────────────
+   Mandan sobre las del diseño. Existen para que mover un edificio dos puntos a
+   la izquierda no dependa de nadie: se arrastra, se suelta y queda. */
+function lzCargarPos() {
+  try {
+    const g = JSON.parse(localStorage.getItem('va-luces-pos') || 'null');
+    if (g) Object.keys(g).forEach((k) => { if (LZ.pos[k]) Object.assign(LZ.pos[k], g[k]); });
+  } catch (e) { /* sin storage se usan las del diseño */ }
+}
+function lzGuardarPos() {
+  try { localStorage.setItem('va-luces-pos', JSON.stringify(LZ.pos)); } catch (e) {}
+}
+function lzOlvidarPos() {
+  try { localStorage.removeItem('va-luces-pos'); } catch (e) {}
+  location.reload();
+}
+
 const LZ = {
   props: {
     velocidad: 1, zoomNivel: 6.5, zoomAncho: 118, brillo: 1.3, azulPiscina: 60,
@@ -76,7 +98,7 @@ const LZ = {
     { id: 'pool', name: 'Piscina',        pool: true,   w: 25,   h: 14.2 },
     { id: 'pump', name: 'Sala de Bombas', pump: true,   w: 6.5,  h: 9.75 },
   ],
-  st: { sel: 'c1', open: false, luces: {}, fuera: new Set(), pend: {}, uz: 1, ux: 0, uy: 0, gest: false, pa: 0.62, pw: 400, listo: false },
+  st: { sel: 'c1', open: false, luces: {}, fuera: new Set(), pend: {}, uz: 1, ux: 0, uy: 0, gest: false, pa: 0.62, pw: 400, listo: false, editar: false, tocado: 'bod' },
   refs: null,
 };
 
@@ -145,6 +167,9 @@ const LZ_GRUPOS = {
    referencia rota deja el panel en blanco sin decir por qué. */
 const lzEsc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+lzCargarPos();
+try { const a = localStorage.getItem('va-luces-aire'); if (a) LZ.props.tamano = Number(a); } catch (e) {}
 
 const lzGrupos = (b) => LZ_GRUPOS[b.id] || [];
 const lzAmbientes = (b) => {
@@ -426,6 +451,15 @@ function lzMontar(caja) {
     <div class="lz-todo">
       <div class="lz-marco" id="lz-marco">
         <button type="button" id="lz-master" style="${v.masterFx}">Apagar todo · <span id="lz-total">${v.total}</span></button>
+
+        <!-- El editor. Mover un edificio dos puntos no deberia costar un
+             despliegue y una espera: se arrastra y queda guardado en este
+             telefono. La version al lado sirve para saber, de un vistazo, si lo
+             que se esta mirando es el codigo de ahora o uno viejo servido por
+             la cache. -->
+        <button type="button" id="lz-editar" style="position:absolute;left:10px;top:10px;z-index:6;background:rgba(244,243,236,0.92);border:1px solid #DAD9D0;border-radius:999px;padding:7px 12px;font-size:12px;font-weight:700;color:#17414F;cursor:pointer">✎ Mover</button>
+        <div style="position:absolute;left:12px;bottom:8px;z-index:4;font-size:9px;color:#A5A399;font-weight:600;pointer-events:none">v${LZ_VER}</div>
+        <div id="lz-editor" style="display:none"></div>
         <div id="lz-plano" style="position:absolute;inset:0;touch-action:none;${v.planeFx}">
           <!-- La cuadrícula de puntos se queda: es el papel sobre el que están
                los edificios, no una línea que cruce por encima de nada. -->
@@ -460,6 +494,8 @@ function lzMontar(caja) {
     marco:  caja.querySelector('#lz-marco'),
     plano:  caja.querySelector('#lz-plano'),
     master: caja.querySelector('#lz-master'),
+    btnEditar: caja.querySelector('#lz-editar'),
+    editor: caja.querySelector('#lz-editor'),
     total:  caja.querySelector('#lz-total'),
     barra:  caja.querySelector('#lz-barra'),
     panel:  caja.querySelector('#lz-panel'),
@@ -528,6 +564,7 @@ function lzPintar() {
   });
 
   lzPintarPanel(v);
+  lzPintarEditor();
 }
 
 /* El panel de abajo sí se vuelve a escribir entero: cambia cuando cambias de
@@ -586,11 +623,14 @@ function lzGestos() {
   if (!mp || mp._lz) return;
   mp._lz = true;
   const ptrs = new Map();
-  let base = null, movido = false, tg = null;
+  let base = null, movido = false, tg = null, arrastre = null;
 
   const encajar = (ux, uy, uz) => {
     const w = mp.offsetWidth || 400, h = mp.offsetHeight || 600;
-    const mx = (uz-1)*w/2 + w*0.5, my = (uz-1)*h/2 + h*0.5;
+    /* Editando se deja arrastrar el doble de lejos: colocar un edificio a veces
+       pide sacarlo del encuadre y volver a por el. */
+    const holgura = LZ.st.editar ? 1 : 0.5;
+    const mx = (uz-1)*w/2 + w*holgura, my = (uz-1)*h/2 + h*holgura;
     return { ux: Math.max(-mx, Math.min(mx, ux)), uy: Math.max(-my, Math.min(my, uy)), uz };
   };
   const aplicar = (o) => { Object.assign(LZ.st, o); lzPintar(); };
@@ -608,6 +648,18 @@ function lzGestos() {
   }, { passive: false });
 
   mp.addEventListener('pointerdown', (e) => {
+    /* En modo mover, el dedo arrastra el EDIFICIO en vez del mapa. */
+    if (LZ.st.editar && !LZ.st.open) {
+      const ed = e.target.closest && e.target.closest('[data-ed]');
+      if (ed) {
+        const p = LZ.pos[ed.dataset.ed];
+        arrastre = { id: ed.dataset.ed, px: e.clientX, py: e.clientY, x0: p.x, y0: p.y };
+        LZ.st.tocado = ed.dataset.ed;
+        movido = false;
+        lzPintar();
+        return;
+      }
+    }
     if (LZ.st.open) return;
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
     base = { ux: LZ.st.ux, uy: LZ.st.uy, uz: LZ.st.uz, ps: [...ptrs.values()].map((p) => ({ ...p })) };
@@ -615,6 +667,22 @@ function lzGestos() {
   });
 
   window.addEventListener('pointermove', (e) => {
+    if (arrastre) {
+      const r = mp.getBoundingClientRect();
+      /* La `y` se guarda SIN la corrección de proporción, que es como está en el
+         archivo; si no, al recargar en otra pantalla el edificio se movería
+         solo. Y se divide por el zoom para que arrastrar un centímetro mueva un
+         centímetro, esté el mapa como esté. */
+      const ky = (LZ.st.pa || LZ_PROP) / LZ_PROP;
+      const z = LZ.st.uz || 1;
+      const dx = (e.clientX - arrastre.px) / r.width  * 100 / z;
+      const dy = (e.clientY - arrastre.py) / r.height * 100 / z / ky;
+      if (Math.abs(e.clientX - arrastre.px) + Math.abs(e.clientY - arrastre.py) > 4) movido = true;
+      LZ.pos[arrastre.id].x = Math.round((arrastre.x0 + dx) * 10) / 10;
+      LZ.pos[arrastre.id].y = Math.round((arrastre.y0 + dy) * 10) / 10;
+      lzPintar();
+      return;
+    }
     if (!ptrs.has(e.pointerId) || LZ.st.open || !base) return;
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const ps = [...ptrs.values()], r = mp.getBoundingClientRect();
@@ -637,6 +705,7 @@ function lzGestos() {
   });
 
   const soltar = (e) => {
+    if (arrastre) { arrastre = null; lzGuardarPos(); lzPintar(); return; }
     if (!ptrs.delete(e.pointerId)) return;
     const ps = [...ptrs.values()];
     base = ps.length ? { ux: LZ.st.ux, uy: LZ.st.uy, uz: LZ.st.uz, ps: ps.map((p) => ({ ...p })) } : null;
@@ -652,6 +721,50 @@ function lzGestos() {
   }, true);
 
   window.addEventListener('resize', () => { lzMedir(); lzPintar(); });
+}
+
+/* ── Modo mover ───────────────────────────────────────────────────────────
+   Un editor dentro de la propia app. No es un lujo: colocar un edificio es una
+   decisión de ojo, y hacerla a distancia —"muévela un poco a la izquierda",
+   despliegue, captura, otra vez— cuesta media hora para dos puntos. Aquí se
+   arrastra y se ve.
+
+   Lo que se mueve queda guardado en este teléfono, encima de lo que dice el
+   archivo. Cuando esté como debe, el botón Copiar deja los números listos para
+   dejarlos fijos en el código, y así valen también en los otros teléfonos. */
+const LZ_BTN = 'background:#E7E6DD;border:1px solid #DAD9D0;border-radius:8px;'
+             + 'padding:7px 10px;font-size:11.5px;font-weight:600;color:#17414F;cursor:pointer';
+
+function lzPintarEditor() {
+  const R = LZ.refs;
+  if (!R || !R.editor) return;
+
+  R.btnEditar.textContent = LZ.st.editar ? '✓ Listo' : '✎ Mover';
+  R.btnEditar.style.background = LZ.st.editar ? '#17414F' : 'rgba(244,243,236,0.92)';
+  R.btnEditar.style.color = LZ.st.editar ? '#F7F6F0' : '#17414F';
+  R.btnEditar.style.display = LZ.st.open ? 'none' : 'inline-block';
+
+  if (!LZ.st.editar) { R.editor.style.display = 'none'; return; }
+
+  const b = LZ.edificios.find((x) => x.id === LZ.st.tocado) || LZ.edificios[0];
+  const p = LZ.pos[b.id];
+  R.editor.style.cssText = 'position:absolute;left:10px;right:10px;bottom:10px;z-index:9;'
+    + 'background:rgba(244,243,236,0.96);border:1px solid #DAD9D0;border-radius:12px;'
+    + 'padding:10px 12px;box-shadow:0 4px 14px rgba(28,28,30,0.12);display:block';
+  R.editor.innerHTML = `
+    <div style="font-size:12.5px;font-weight:700;color:#1C1C1E;margin-bottom:2px">
+      ${lzEsc(b.name)}</div>
+    <div style="font-size:11px;color:#6A6E67;margin-bottom:8px">
+      x ${p.x} &middot; y ${p.y} &middot; tamaño ${p.t} &middot; aire ${LZ.props.tamano.toFixed(2)}
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button type="button" data-ed-tam="-1"     style="${LZ_BTN}">− tamaño</button>
+      <button type="button" data-ed-tam="1"      style="${LZ_BTN}">+ tamaño</button>
+      <button type="button" data-ed-aire="-0.05" style="${LZ_BTN}">− aire</button>
+      <button type="button" data-ed-aire="0.05"  style="${LZ_BTN}">+ aire</button>
+      <button type="button" id="lz-ed-copiar"    style="${LZ_BTN}">Copiar</button>
+      <button type="button" id="lz-ed-reset"     style="${LZ_BTN}">Deshacer</button>
+    </div>`;
 }
 
 /* ── Los aparatos ────────────────────────────────────────────────────────── */
@@ -723,8 +836,44 @@ async function lzVarios(pares, accion) {
 document.addEventListener('click', (e) => {
   if (!LZ.refs || !LZ.refs.caja.contains(e.target)) return;
 
+  /* ── Modo mover ── */
+  if (e.target.closest('#lz-editar')) {
+    LZ.st.editar = !LZ.st.editar;
+    lzPintar();
+    return;
+  }
+  const tam = e.target.closest('[data-ed-tam]');
+  if (tam) {
+    const p = LZ.pos[LZ.st.tocado];
+    p.t = Math.max(4, Math.round((p.t + Number(tam.dataset.edTam)) * 10) / 10);
+    lzGuardarPos(); lzPintar(); return;
+  }
+  const aire = e.target.closest('[data-ed-aire]');
+  if (aire) {
+    LZ.props.tamano = Math.min(1.4, Math.max(0.4,
+      Math.round((LZ.props.tamano + Number(aire.dataset.edAire)) * 100) / 100));
+    try { localStorage.setItem('va-luces-aire', String(LZ.props.tamano)); } catch (er) {}
+    lzPintar(); return;
+  }
+  if (e.target.closest('#lz-ed-copiar')) {
+    const txt = Object.keys(LZ.pos).map((k) =>
+      `    ${(k + ':').padEnd(6)}{ x: ${LZ.pos[k].x}, y: ${LZ.pos[k].y}, t: ${LZ.pos[k].t} },`)
+      .join('\n') + `\n    // tamano: ${LZ.props.tamano}`;
+    try { navigator.clipboard.writeText(txt); } catch (er) {}
+    VA_PANEL.avisar('Posiciones copiadas. Pegaselas a Claude para dejarlas fijas.', 'ok');
+    return;
+  }
+  if (e.target.closest('#lz-ed-reset')) {
+    if (confirm('Volver a las posiciones del diseno?')) lzOlvidarPos();
+    return;
+  }
+
   const tap = e.target.closest('[data-tap]');
   if (tap) {
+    /* Editando, tocar un edificio lo SELECCIONA para verlo en la barra; no abre
+       su plano. Abrirlo en mitad de una colocacion saca del mapa justo cuando
+       se esta comparando con el de al lado. */
+    if (LZ.st.editar) { LZ.st.tocado = tap.dataset.tap; lzPintar(); return; }
     Object.assign(LZ.st, { sel: tap.dataset.tap, open: true, uz: 1, ux: 0, uy: 0 });
     lzPintar();
     return;
