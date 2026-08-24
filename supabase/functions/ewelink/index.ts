@@ -698,6 +698,35 @@ async function estado() {
   return { luces, fuera, disparadas };
 }
 
+/* Qué sabe hacer un aparato de Tuya, en crudo.
+ *
+ * Existe porque adivinar el mando correcto cuesta días: `master_mode: sos` en
+ * estas centrales tarda minutos en sonar, y casi seguro hay otro código que
+ * dispara la sirena al instante. Esto lo pregunta en vez de suponerlo.
+ *
+ * Devuelve el estado actual y la lista de instrucciones que el propio aparato
+ * declara. Es de solo lectura y no acciona nada. */
+async function diagnostico(body: { zona?: string; dispositivo?: string }) {
+  const filtro = body.dispositivo
+    ? `device_id=eq.${encodeURIComponent(body.dispositivo)}`
+    : `zona=eq.${encodeURIComponent(body.zona ?? '')}&tipo=eq.alarma`;
+  const filas = await sb(`dispositivos?${filtro}&proveedor=eq.tuya&select=device_id,nombre,codigo`);
+  if (!filas?.length) throw new Error('No encontré ese aparato de SmartLife.');
+
+  const salida = [];
+  for (const f of filas) {
+    const out: Record<string, unknown> = { nombre: f.nombre, device_id: f.device_id };
+    try {
+      out.estado = (await tuya(`/v1.0/devices/${f.device_id}/status`));
+    } catch (e) { out.estado_error = (e as Error).message; }
+    try {
+      out.instrucciones = (await tuya(`/v1.0/devices/${f.device_id}/functions`));
+    } catch (e) { out.instrucciones_error = (e as Error).message; }
+    salida.push(out);
+  }
+  return salida;
+}
+
 /* Encender o apagar ahora, desde el panel. A diferencia de /cron, esto SÍ
    recibe qué y a qué, y por eso exige sesión. */
 async function accion(body: { dispositivo?: string; cabana?: string; rol?: string; accion: string }) {
@@ -830,6 +859,7 @@ Deno.serve(async (req) => {
     if (ruta === 'preparar')     return json(await preparar());
     if (ruta === 'dispositivos') return json(await dispositivos());
     if (ruta === 'estado')       return json(await estado());
+    if (ruta === 'diagnostico')  return json(await diagnostico(await req.json()));
     if (ruta === 'accion')       return json(await accion(await req.json()));
 
     return json({ error: 'Ruta desconocida.' }, 404);
