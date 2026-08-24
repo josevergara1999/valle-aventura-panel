@@ -39,7 +39,7 @@ const LZ_PROP = 390 / 844;
 /* Se enseña en una esquina del mapa. Parece una tontería y no lo es: sin esto,
    "sigo viendo lo de antes" y "no se subió el cambio" son indistinguibles desde
    fuera, y se pierde media hora adivinando cuál de los dos es. */
-const LZ_VER = 12;
+const LZ_VER = 13;
 
 /* ── Posiciones movidas a mano ─────────────────────────────────────────────
    Mandan sobre las del diseño. Existen para que mover un edificio dos puntos a
@@ -620,7 +620,6 @@ function lzMontar(caja) {
         </div>
 
         <button type="button" id="lz-editar" style="position:absolute;left:10px;top:52px;z-index:6;background:rgba(244,243,236,0.92);border:1px solid #DAD9D0;border-radius:999px;padding:7px 12px;font-size:12px;font-weight:700;color:#17414F;cursor:pointer">✎ Mover</button>
-        <div style="position:absolute;left:12px;bottom:8px;z-index:4;font-size:9px;color:#A5A399;font-weight:600;pointer-events:none">v${LZ_VER}</div>
         <div id="lz-editor" style="display:none"></div>
         <div id="lz-plano" style="position:absolute;inset:0;touch-action:none;${v.planeFx}">
           <!-- La cuadrícula de puntos se queda: es el papel sobre el que están
@@ -654,6 +653,11 @@ function lzMontar(caja) {
             <path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>
           <span id="lz-toast-txt">${v.toastTexto}</span>
         </button>
+        <!-- La version, al final del todo y por encima de todo. Antes iba antes
+             del plano y quedaba tapada por el: justo el dato que sirve para
+             saber si lo que se esta mirando es el codigo de ahora, escondido
+             detras del codigo de ahora. -->
+        <div style="position:absolute;right:8px;bottom:6px;z-index:30;font-size:9px;color:#6A6E67;font-weight:700;background:rgba(244,243,236,0.85);padding:2px 6px;border-radius:999px;pointer-events:none">v${LZ_VER}</div>
       </div>
     </div>`;
 
