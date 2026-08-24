@@ -188,6 +188,104 @@ async function ewelink(ruta: string, opciones: RequestInit = {}) {
   return d.data;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   SmartLife (Tuya)
+   ══════════════════════════════════════════════════════════════════════════
+   Otra nube, otra forma de firmar, y desde el panel exactamente lo mismo: un
+   interruptor. Por eso vive aquí dentro y no en una función aparte — quien
+   decide a qué nube hablar es la columna `proveedor` del propio aparato, y así
+   el mapa, el timer y el botón de apagar todo no se enteran de que hay dos.
+
+   (La función se sigue llamando `ewelink` por historia. Renombrarla obligaría a
+   rehacer el cron y el panel a cambio de nada; el nombre es el único sitio
+   donde queda la mentira, y queda dicha aquí.)
+
+   TRES DIFERENCIAS CON EWELINK QUE CUESTAN UNA TARDE SI NO SE SABEN
+   ---------------------------------------------------------------
+   · La firma va en HEXADECIMAL MAYÚSCULA, no en base64.
+   · Lo que se firma incluye el hash del cuerpo y la ruta CON su query.
+   · El token dura 2 horas, no 30 días. Se renueva casi en cada pasada. */
+
+const TUYA_ID     = Deno.env.get('TUYA_ID')     ?? '';
+const TUYA_SECRET = Deno.env.get('TUYA_SECRET') ?? '';
+
+const tuyaHost = (region: string) => `https://openapi.tuya${region || 'us'}.com`;
+
+const hex = (b: ArrayBuffer) =>
+  [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
+
+async function sha256(texto: string) {
+  return hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto)));
+}
+
+async function tuyaFirma(str: string) {
+  const k = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(TUYA_SECRET),
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+  );
+  return hex(await crypto.subtle.sign('HMAC', k, new TextEncoder().encode(str))).toUpperCase();
+}
+
+async function tuyaCabeceras(metodo: string, ruta: string, cuerpo: string, token: string) {
+  const t = String(Date.now());
+  const n = nonce(16);
+  const aFirmar = `${metodo}\n${await sha256(cuerpo)}\n\n${ruta}`;
+  return {
+    client_id: TUYA_ID,
+    sign: await tuyaFirma(TUYA_ID + token + t + n + aFirmar),
+    t, nonce: n,
+    sign_method: 'HMAC-SHA256',
+    'Content-Type': 'application/json',
+    ...(token ? { access_token: token } : {}),
+  };
+}
+
+/* El token de Tuya dura dos horas. Se pide uno nuevo cuando quedan menos de
+   cinco minutos en vez de refrescarlo: el endpoint de refresco añade un caso
+   más que puede fallar y pedirlo entero cuesta lo mismo. */
+async function tuyaToken(): Promise<{ at: string; region: string }> {
+  const c = (await sb('smartlife_cuenta?id=eq.1&select=*'))?.[0] ?? null;
+  const region = c?.region || 'us';
+  if (c?.access_token && c.expira_at && new Date(c.expira_at).getTime() - Date.now() > 300000) {
+    return { at: c.access_token, region };
+  }
+  if (!TUYA_ID || !TUYA_SECRET) throw new Error('Faltan las claves de SmartLife.');
+
+  const ruta = '/v1.0/token?grant_type=1';
+  const r = await fetch(tuyaHost(region) + ruta, {
+    headers: await tuyaCabeceras('GET', ruta, '', ''),
+  });
+  const d = await r.json();
+  if (!d.success) {
+    console.error('tuya token:', JSON.stringify(d));
+    throw new Error(`SmartLife (${d.code}): ${d.msg ?? 'no se pudo entrar'}`);
+  }
+  await sb('smartlife_cuenta?id=eq.1', {
+    method: 'PATCH',
+    body: JSON.stringify({
+      access_token: d.result.access_token,
+      refresh_token: d.result.refresh_token,
+      uid: d.result.uid ?? c?.uid ?? null,
+      expira_at: new Date(Date.now() + (d.result.expire_time ?? 7200) * 1000).toISOString(),
+      actualizado_at: new Date().toISOString(),
+    }),
+  });
+  return { at: d.result.access_token, region };
+}
+
+async function tuya(ruta: string, metodo = 'GET', cuerpo?: unknown) {
+  const { at, region } = await tuyaToken();
+  const txt = cuerpo ? JSON.stringify(cuerpo) : '';
+  const r = await fetch(tuyaHost(region) + ruta, {
+    method: metodo,
+    headers: await tuyaCabeceras(metodo, ruta, txt, at),
+    ...(txt ? { body: txt } : {}),
+  });
+  const d = await r.json();
+  if (!d.success) throw new Error(`SmartLife ${d.code}: ${d.msg ?? ''}`);
+  return d.result;
+}
+
 /* El formato del comando depende del modelo. Un interruptor de un canal acepta
    `switch`; uno de varios exige `switches` con el número de salida. Por eso se
    guarda el canal al etiquetar: sin él habría que adivinar por el nombre. */
@@ -199,11 +297,25 @@ const comando = (dev: { canal: number | null }, accion: string) =>
 /* El comando va al APARATO, no a la fila. Una fila puede ser un canal suelto de
    un interruptor de tres, y eWeLink solo entiende el aparato entero mas el
    numero de salida. */
-const accionar = (
-  dev: { id: string; device_id?: string | null; canal: number | null },
-  accion: string,
-) =>
-  ewelink('/v2/device/thing/status', {
+type Aparato = {
+  id: string; device_id?: string | null; canal: number | null;
+  proveedor?: string | null; codigo?: string | null;
+};
+
+const accionar = (dev: Aparato, accion: string) => {
+  if (dev.proveedor === 'tuya') {
+    const codigo = dev.codigo || 'switch_1';
+    /* Una alarma no es un interruptor: no se "enciende", se ARMA. Su mando
+       toma palabras (`arm` / `disarmed`), no un sí o un no. Encender y armar
+       son la misma intención desde el panel, así que se traduce aquí y no se
+       inventa una segunda acción que el resto del código tendría que conocer. */
+    const valor = codigo === 'master_mode'
+      ? (accion === 'on' ? 'arm' : 'disarmed')
+      : accion === 'on';
+    return tuya(`/v1.0/devices/${dev.device_id ?? dev.id}/commands`, 'POST',
+      { commands: [{ code: codigo, value: valor }] });
+  }
+  return ewelink('/v2/device/thing/status', {
     method: 'POST',
     body: JSON.stringify({
       type: 1,
@@ -211,6 +323,51 @@ const accionar = (
       params: comando(dev, accion),
     }),
   });
+};
+
+/* Lo que trae Tuya de cada aparato, convertido a filas de `dispositivos`.
+   Se mira lo que el aparato DICE que sabe hacer en vez de deducirlo del modelo:
+   los interruptores exponen `switch` o `switch_1..n`, y las alarmas
+   `master_mode`. Un aparato que no expone ninguno de los dos —un sensor, una
+   cámara— no se guarda: no hay nada que encender en él. */
+function tuyaFilas(dev: {
+  id: string; name?: string; online?: boolean;
+  status?: Array<{ code: string; value: unknown }>;
+}, ahora: string) {
+  const filas = [];
+  const estados = dev.status ?? [];
+  const base = {
+    device_id: dev.id, proveedor: 'tuya', sala: 'SmartLife',
+    en_linea: dev.online === true, visto_at: ahora, uiid: null,
+  };
+
+  /* Ojo: aquí NO se escribe `tipo`. El guardado en bloque sobrescribe lo que
+     lleve en el cuerpo, y `tipo` es lo que se etiqueta a mano — mandarlo en
+     cada listado borraría el trabajo de etiquetar cada vez que se pulsa Buscar.
+     Las alarmas se marcan aparte, después, y solo las que aún no lo estén. */
+  const alarma = estados.find((s) => s.code === 'master_mode');
+  if (alarma) {
+    filas.push({ ...base, id: `tuya:${dev.id}`, canal: null, codigo: 'master_mode',
+      nombre: dev.name ?? dev.id });
+    return filas;
+  }
+
+  const llaves = estados.filter((s) =>
+    /^switch(_\d+)?$/.test(s.code) && typeof s.value === 'boolean');
+  if (!llaves.length) return filas;
+
+  llaves.forEach((s, i) => {
+    const solo = llaves.length === 1;
+    filas.push({
+      ...base,
+      id: solo ? `tuya:${dev.id}` : `tuya:${dev.id}:${s.code}`,
+      canal: solo ? null : i,
+      codigo: s.code,
+      nombre: solo ? (dev.name ?? dev.id) : `${dev.name ?? dev.id} - ${s.code.replace('switch_', 'Canal ')}`,
+    });
+  });
+  return filas;
+}
 
 // ── Las rutas ──────────────────────────────────────────────────────────────
 
@@ -352,6 +509,8 @@ async function dispositivos() {
     const uiid = (dev.extra as { uiid?: number } | undefined)?.uiid ?? null;
     const base = {
       device_id: dev.deviceid,
+      proveedor: 'ewelink',
+      codigo: null,
       sala,
       uiid,
       en_linea: dev.online === true,
@@ -383,6 +542,20 @@ async function dispositivos() {
      cada uno tarda lo suyo con la señal de la montaña.
      El `merge` solo toca las columnas que van en el cuerpo, asi que `tipo` y
      `cabana_id` —lo unico que se etiqueta a mano— sobreviven a volver a listar. */
+  /* Y ahora los de SmartLife, a la misma lista. Si esa cuenta no está conectada
+     todavía, se sigue: media lista es mejor que un error que deja al panel sin
+     ninguna. */
+  try {
+    const c = (await sb('smartlife_cuenta?id=eq.1&select=uid'))?.[0];
+    const d2 = c?.uid
+      ? await tuya(`/v1.0/users/${c.uid}/devices`)
+      : (await tuya('/v1.3/iot-03/devices?page_size=100'))?.list;
+    console.log('SmartLife devolvio', Array.isArray(d2) ? d2.length : 0, 'aparatos');
+    for (const dev of (d2 ?? [])) filas.push(...tuyaFilas(dev, ahora));
+  } catch (e) {
+    console.error('smartlife:', (e as Error).message);
+  }
+
   if (filas.length) {
     await sb('dispositivos?on_conflict=id', {
       method: 'POST',
@@ -390,6 +563,17 @@ async function dispositivos() {
       body: JSON.stringify(filas),
     });
   }
+  /* Una alarma se reconoce sola por su mando, así que se marca aquí en vez de
+     hacerte elegirlo en un desplegable. Solo las que siguen "sin usar": si
+     alguna se cambió a mano, esa decisión manda. */
+  try {
+    await sb('dispositivos?codigo=eq.master_mode&tipo=eq.otro', {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ tipo: 'alarma' }),
+    });
+  } catch (e) { console.error('marcar alarmas:', (e as Error).message); }
+
   return await sb('dispositivos?select=*&order=sala.asc.nullslast,nombre.asc');
 }
 
@@ -417,13 +601,42 @@ async function estado() {
     enLinea[t.itemData.deviceid] = t.itemData.online === true;
   }
 
+  /* Lo mismo del lado de SmartLife. Si esa cuenta falla se sigue: el estado de
+     las luces de eWeLink no tiene por qué perderse porque otra nube esté caída,
+     y lo que no se sepa sale como "sin señal", que es la verdad. */
+  const tEstado: Record<string, Record<string, unknown>> = {};
+  const tLinea: Record<string, boolean> = {};
+  try {
+    const c = (await sb('smartlife_cuenta?id=eq.1&select=uid'))?.[0];
+    const lista = c?.uid
+      ? await tuya(`/v1.0/users/${c.uid}/devices`)
+      : (await tuya('/v1.3/iot-03/devices?page_size=100'))?.list;
+    for (const dev of (lista ?? [])) {
+      const m: Record<string, unknown> = {};
+      for (const s of (dev.status ?? [])) m[s.code] = s.value;
+      tEstado[dev.id] = m;
+      tLinea[dev.id] = dev.online === true;
+    }
+  } catch (e) { console.error('smartlife estado:', (e as Error).message); }
+
   const filas = await sb('dispositivos?zona=not.is.null&clave=not.is.null&activo=is.true'
-                       + '&select=zona,clave,device_id,canal');
+                       + '&select=zona,clave,device_id,canal,proveedor,codigo');
 
   const luces: Record<string, boolean> = {};
   const fuera: string[] = [];
   for (const f of filas ?? []) {
     const k = `${f.zona}:${f.clave}`;
+
+    if (f.proveedor === 'tuya') {
+      const m = tEstado[f.device_id];
+      if (!m || !tLinea[f.device_id]) { fuera.push(k); continue; }
+      const v = m[f.codigo || 'switch_1'];
+      /* Una alarma armada cuenta como "encendida" en el mapa. Cualquier modo
+         que no sea `disarmed` —armada del todo o en casa— es vigilando. */
+      luces[k] = f.codigo === 'master_mode' ? (v !== undefined && v !== 'disarmed') : v === true;
+      continue;
+    }
+
     const p = params[f.device_id];
     if (!p || !enLinea[f.device_id]) { fuera.push(k); continue; }
     const sw = p.switches as Array<{ switch?: string }> | undefined;
@@ -451,7 +664,7 @@ async function accion(body: { dispositivo?: string; cabana?: string; rol?: strin
   else if (body.cabana) filtro = `cabana_id=eq.${body.cabana}&tipo=eq.luz`;
   else throw new Error('Falta decir qué aparato.');
 
-  const devs = await sb(`dispositivos?${filtro}&activo=is.true&select=id,device_id,nombre,canal`);
+  const devs = await sb(`dispositivos?${filtro}&activo=is.true&select=id,device_id,nombre,canal,proveedor,codigo`);
   if (!devs?.length) throw new Error('No hay ningún aparato etiquetado para eso.');
 
   /* Una cabaña puede tener varias luces y se encienden todas. Si una falla, se
@@ -483,7 +696,7 @@ async function cron() {
       const filtro = o.rol === 'tinaja'
         ? 'tipo=eq.tinaja'
         : `cabana_id=eq.${o.cabana_id}&tipo=eq.luz`;
-      const devs = await sb(`dispositivos?${filtro}&activo=is.true&select=id,device_id,nombre,canal`);
+      const devs = await sb(`dispositivos?${filtro}&activo=is.true&select=id,device_id,nombre,canal,proveedor,codigo`);
       if (!devs?.length) throw new Error('No hay aparato etiquetado para esta orden.');
       for (const dev of devs) await accionar(dev, o.accion);
       await rpc('ewelink_orden_resultado', { p_orden: o.id, p_ok: true });
@@ -498,7 +711,10 @@ async function cron() {
 
   /* Los dos relojes que caducan en silencio. Se miran aquí y no en un cron
      aparte porque un job más es un job más que se puede olvidar de crear. */
-  try { hecho.avisos = await rpc('ewelink_revisar_caducidades', {}) ?? 0; }
+  try {
+    hecho.avisos = (await rpc('ewelink_revisar_caducidades', {}) ?? 0)
+                 + (await rpc('smartlife_revisar_caducidad', {}) ?? 0);
+  }
   catch (e) { console.error('caducidades:', (e as Error).message); }
 
   return hecho;
