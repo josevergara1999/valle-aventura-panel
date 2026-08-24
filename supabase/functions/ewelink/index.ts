@@ -710,7 +710,13 @@ async function accion(body: { dispositivo?: string; cabana?: string; rol?: strin
   else if (body.zona && body.clave) {
     filtro = `zona=eq.${encodeURIComponent(body.zona)}&clave=eq.${encodeURIComponent(body.clave)}`;
   } else if (body.rol === 'tinaja') filtro = 'tipo=eq.tinaja';
-  else if (body.zona) filtro = `zona=eq.${encodeURIComponent(body.zona)}`;
+  /* "Toda la zona" significa SUS LUCES, nunca su alarma.
+     La alarma vive en la misma zona que las luces, así que un filtro por zona a
+     secas la barría con ellas: pedir "apaga todas las luces de la cabaña 3"
+     dejaba además la cabaña sin vigilancia, sin decirlo. Una alarma solo se
+     toca nombrándola —con `clave: 'alarma'`— y nunca de refilón.
+     Es la misma regla por la que las bombas no entran en el botón de luces. */
+  else if (body.zona) filtro = `zona=eq.${encodeURIComponent(body.zona)}&tipo=eq.luz`;
   else if (body.cabana) filtro = `cabana_id=eq.${body.cabana}&tipo=eq.luz`;
   else throw new Error('Falta decir qué aparato.');
 
