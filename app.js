@@ -3319,7 +3319,7 @@ async function pintarLuces() {
      ni sale en el plano, pero hay noches que se usa sin turno y el boton tiene
      que estar en alguna parte. */
   if (!caja.querySelector("#lz-host")) {
-    caja.innerHTML = '<div id="lz-host"></div><div id="lz-tinaja"></div>';
+    caja.innerHTML = '<div id="lz-host"></div>';
     LZ.refs = null;
   }
 
@@ -3331,52 +3331,11 @@ async function pintarLuces() {
   }
   lzMedir();
   lzPintar();
-  await pintarTinaja(caja.querySelector("#lz-tinaja"));
+
 
 }
 
-/* La tinaja, debajo del mapa. No es una luz y no sale en el plano, pero dice a
-   que hora se enciende sola — que es lo que evita subir a encenderla "por si
-   acaso" y dejarla ocho horas. */
-async function pintarTinaja(caja) {
-  if (!caja || !el.hayTinaja) { if (caja) caja.innerHTML = ""; return; }
-  let prox = null;
-  let llaves = [];
-  try {
-    prox = (await api("ewelink_ordenes?rol=eq.tinaja&accion=eq.on&estado=eq.pendiente"
-                    + "&select=momento&order=momento.asc&limit=1"))?.[0] || null;
-  } catch (e) { /* sin turno a la vista, se dice igual */ }
-  /* Los interruptores, uno por linea. La tinaja tiene dos —el de eWeLink y el
-     de SmartLife— y el boton acciona los dos a la vez, que es lo correcto:
-     acordarse de pulsar dos es la clase de cosa que un dia se queda a medias.
-     Pero verlos por separado si hace falta, porque cuando uno no responda hay
-     que saber CUAL antes de subir a mirar. */
-  try {
-    llaves = await api("dispositivos?tipo=eq.tinaja&activo=is.true"
-                     + "&select=nombre,proveedor,en_linea&order=proveedor");
-  } catch (e) { llaves = []; }
-  caja.innerHTML = `
-    <h2 class="titulo-seccion" style="margin-top:22px">Tinaja</h2>
-    <div class="tarjeta luz-tarjeta">
-      <div class="luz-cab">
-        <b>Tinaja</b>
-        <span class="luz-nota">${prox
-          ? "se enciende sola el " + diaLocal(prox.momento) + " a las " + horaLocal(prox.momento)
-          : "sin turno programado"}</span>
-      </div>
-      ${!llaves.length ? "" : `<div class="tj-llaves">
-        ${llaves.map((k) => `<div class="tj-llave${k.en_linea === false ? " fuera" : ""}">
-          <span>${esc(k.nombre)}</span>
-          <span>${k.proveedor === "tuya" ? "SmartLife" : "eWeLink"}${
-            k.en_linea === false ? " · no responde" : ""}</span>
-        </div>`).join("")}
-      </div>`}
-      <div class="fila">
-        <button type="button" class="secundario" data-luz="__tinaja" data-acc="off">Apagar</button>
-        <button type="button" data-luz="__tinaja" data-acc="on">Encender</button>
-      </div>
-    </div>`;
-}
+
 
 document.addEventListener("click", async (e) => {
   const b = e.target.closest("[data-luz]");

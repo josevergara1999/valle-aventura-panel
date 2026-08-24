@@ -39,7 +39,7 @@ const LZ_PROP = 390 / 844;
 /* Se enseña en una esquina del mapa. Parece una tontería y no lo es: sin esto,
    "sigo viendo lo de antes" y "no se subió el cambio" son indistinguibles desde
    fuera, y se pierde media hora adivinando cuál de los dos es. */
-const LZ_VER = 16;
+const LZ_VER = 17;
 
 /* ── Posiciones movidas a mano ─────────────────────────────────────────────
    Mandan sobre las del diseño. Existen para que mover un edificio dos puntos a
@@ -192,10 +192,12 @@ const LZ_GRUPOS = {
   pool: [{ name: 'Luces Piscina', icon: LZ_IC.agua, ch: [['piscina','Canal1']] }],
   pump: [
     { name: 'Bomba  Piscina', icon: LZ_IC.bomba, ch: [['bombas','Canal1']] },
-    /* En la cuenta de eWeLink no hay ninguna segunda bomba. Se deja a la vista
-       y desconectada en vez de borrarla del diseño: el día que se instale, es
-       una fila en la base y no un despliegue. */
-    { name: 'Bomba 2', icon: LZ_IC.bomba, off: true, ch: [] },
+    /* La tinaja vive aquí porque su enchufe está aquí. Ocupa el sitio de la
+       "Bomba 2" del diseño, que no tiene ningún aparato detrás en la cuenta:
+       mejor un grupo que existe que uno que nunca se va a poder tocar.
+       Se llama SmartLife porque es la otra nube, y saberlo importa cuando algo
+       no responde: no es el mismo sitio al que ir a mirar. */
+    { name: 'SmartLife', icon: LZ_IC.agua, tinaja: true, ch: [['tinaja','Canal1']] },
   ],
 };
 
@@ -451,7 +453,12 @@ function lzValores() {
     const alguna = nOn > 0;
     return {
       name: gp.name, icon: gp.icon,
+      /* La tinaja dice a qué hora se enciende sola en vez de "Apagado". Es la
+         única de estas llaves que tiene una cita puesta, y saberlo es lo que
+         evita subir a encenderla por si acaso. */
       sub: gp.off ? 'Desconectado'
+         : (gp.tinaja && !alguna && S.proxTinaja)
+           ? `se enciende sola ${S.proxTinaja}`
          : (alguna ? `${nOn} de ${gp.ch.length} encendida${nOn===1?'':'s'}` : 'Apagado'),
       chip: `width:34px;height:34px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;transition:background .25s,color .25s;background:${alguna?'rgba(23,65,79,0.10)':'#E7E6DD'};color:${alguna?'#17414F':'#8A8D86'};`,
       channels: gp.ch.map(([k, etiqueta]) => {
@@ -1013,6 +1020,17 @@ async function lzCargarEstado() {
     const al = await VA_PANEL.api('dispositivos?tipo=eq.alarma&activo=is.true&select=zona');
     LZ.st.conAlarma = new Set((al || []).map((a) => a.zona).filter(Boolean));
   } catch (e) { LZ.st.conAlarma = new Set(); }
+
+  /* El próximo encendido de tinaja que hay programado, para decirlo en su grupo
+     en vez de en una tarjeta aparte. */
+  try {
+    const o = (await VA_PANEL.api('ewelink_ordenes?rol=eq.tinaja&accion=eq.on'
+                                + '&estado=eq.pendiente&select=momento&order=momento.asc&limit=1'))?.[0];
+    LZ.st.proxTinaja = o
+      ? `${new Date(o.momento).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })} a las `
+        + new Date(o.momento).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
+      : null;
+  } catch (e) { LZ.st.proxTinaja = null; }
 
   try {
     const d = await VA_PANEL.elLlamar('estado');
