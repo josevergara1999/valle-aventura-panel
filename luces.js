@@ -39,7 +39,7 @@ const LZ_PROP = 390 / 844;
 /* Se enseña en una esquina del mapa. Parece una tontería y no lo es: sin esto,
    "sigo viendo lo de antes" y "no se subió el cambio" son indistinguibles desde
    fuera, y se pierde media hora adivinando cuál de los dos es. */
-const LZ_VER = 13;
+const LZ_VER = 14;
 
 /* ── Posiciones movidas a mano ─────────────────────────────────────────────
    Mandan sobre las del diseño. Existen para que mover un edificio dos puntos a
@@ -507,17 +507,22 @@ function lzValores() {
 
     alarmaHay: selConAlarma,
     alarmaBtnFx: `display:${selConAlarma?'flex':'none'};align-items:center;gap:10px;flex:none;width:100%;text-align:left;border-radius:12px;padding:12px 14px;cursor:pointer;transition:background .3s,border-color .3s,color .3s;border:1px solid ${aEncendida?aFondo:'#DAD9D0'};background:${aFondo};color:${aEncendida?'#F7F6F0':'#1C1C1E'};${selDisparada?'animation:lz-blink 0.8s ease-in-out infinite;':''}`,
-    alarmaIconFx: `width:34px;height:34px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;background:${aEncendida?'rgba(247,246,240,0.18)':'#E7E6DD'};color:${aEncendida?'#F7F6F0':'#8A8D86'};`,
+    alarmaIconFx: `width:34px;height:34px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;transition:background .3s,color .3s;background:${aEncendida?'rgba(247,246,240,0.16)':'#E7E6DD'};color:${aEncendida?'#F7F6F0':'#8A8D86'};`,
     alarmaBtnIcon: aEncendida ? iconoAbierto : iconoCerrado,
     alarmaSub: S.alarmaPend[selB.id] ? 'Mandando...'
              : selDisparada ? '¡Alarma activada!'
              : selArmada ? 'Perímetro armado' : 'Sin protección',
-    alarmaSubFx: `font-size:10.5px;color:${aEncendida?'rgba(247,246,240,0.85)':'#6A6E67'};`,
+    alarmaSubFx: `font-size:10.5px;transition:color .3s;color:${aEncendida?'rgba(247,246,240,0.75)':'#6A6E67'};`,
     /* El SOS de la cabaña desaparece cuando ya está sonando: pulsarlo otra vez
-       no haría nada y el sitio lo necesita el botón de desarmar. */
-    sosZonaFx: `display:${selDisparada ? 'none' : 'inline-flex'};flex:none;font-size:11px;font-weight:900;letter-spacing:0.1em;padding:8px 12px;margin-right:8px;border-radius:999px;cursor:pointer;border:none;color:#F7F6F0;background:#B3402F;box-shadow:0 2px 8px rgba(179,64,47,0.4);`,
+       no haría nada y el sitio lo necesita el botón de desarmar.
+       Sin margen propio: la separación la da el `gap` de la fila, como en el
+       resto del diseño. */
+    sosZonaFx: `display:${selDisparada ? 'none' : 'inline-flex'};flex:none;font-size:11px;font-weight:900;letter-spacing:0.1em;padding:8px 12px;border-radius:999px;cursor:pointer;border:none;color:#F7F6F0;background:#B3402F;box-shadow:0 2px 8px rgba(179,64,47,0.4);`,
     alarmaPill: aEncendida ? 'DESARMAR' : 'ARMAR',
-    alarmaPillFx: `flex:none;font-size:10.5px;font-weight:900;letter-spacing:0.06em;padding:7px 11px;border-radius:999px;background:${aEncendida?'rgba(247,246,240,0.18)':'#17414F'};color:#F7F6F0;`,
+    /* Con borde y transparente, no rellena: la píldora dice qué PASARÍA al
+       tocar, no lo que hay. Rellena competía con el botón de SOS, que sí es una
+       acción inmediata. */
+    alarmaPillFx: `flex:none;font-size:10px;font-weight:800;letter-spacing:0.08em;padding:6px 10px;border-radius:999px;transition:background .3s,color .3s,border-color .3s;border:1px solid ${aEncendida?'rgba(247,246,240,0.5)':'rgba(179,64,47,0.45)'};color:${aEncendida?'#F7F6F0':'#B3402F'};background:${aEncendida?'rgba(247,246,240,0.12)':'transparent'};`,
 
     /* La franja de abajo cuando salta una. Ocupa el ancho entero y parpadea a
        propósito: es lo único de esta pantalla que no puede pasar desapercibido. */
