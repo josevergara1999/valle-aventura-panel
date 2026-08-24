@@ -665,6 +665,7 @@ async function estado() {
 
   const luces: Record<string, boolean> = {};
   const fuera: string[] = [];
+  const disparadas: string[] = [];
   for (const f of filas ?? []) {
     const k = `${f.zona}:${f.clave}`;
 
@@ -675,6 +676,14 @@ async function estado() {
       /* Una alarma armada cuenta como "encendida" en el mapa. Cualquier modo
          que no sea `disarmed` —armada del todo o en casa— es vigilando. */
       luces[k] = f.codigo === 'master_mode' ? (v !== undefined && v !== 'disarmed') : v === true;
+      /* Armada y DISPARADA no son lo mismo, y la diferencia es toda la que hay.
+         La central lo publica aparte en `master_state`; si ese modelo no lo
+         publica, la parte roja queda conectada y nunca se enciende sola — que
+         es mejor que inventarse un salto de alarma. */
+      if (f.codigo === 'master_mode') {
+        const st = m['master_state'];
+        if (st !== undefined && st !== 'normal' && st !== 'disarmed') disparadas.push(k);
+      }
       continue;
     }
 
@@ -686,7 +695,7 @@ async function estado() {
       : (Array.isArray(sw) ? sw[f.canal]?.switch : undefined);
     luces[k] = v === 'on';
   }
-  return { luces, fuera };
+  return { luces, fuera, disparadas };
 }
 
 /* Encender o apagar ahora, desde el panel. A diferencia de /cron, esto SÍ

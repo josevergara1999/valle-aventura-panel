@@ -39,7 +39,7 @@ const LZ_PROP = 390 / 844;
 /* Se enseña en una esquina del mapa. Parece una tontería y no lo es: sin esto,
    "sigo viendo lo de antes" y "no se subió el cambio" son indistinguibles desde
    fuera, y se pierde media hora adivinando cuál de los dos es. */
-const LZ_VER = 10;
+const LZ_VER = 11;
 
 /* ── Posiciones movidas a mano ─────────────────────────────────────────────
    Mandan sobre las del diseño. Existen para que mover un edificio dos puntos a
@@ -69,6 +69,11 @@ const LZ = {
        agrandar el terreno, no empequeñecer una bodega.
        Es el número para dar o quitar aire al mapa entero. */
     tamano: 0.85,
+    /* El perímetro de alarma. `separacion` es cuánto se despega del contorno del
+       edificio, en puntos del dibujo del plano. */
+    alarmaSeparacion: 3,
+    alarmaEstilo: 'Prepicada',   // 'Prepicada' | 'Continua' | 'Puntos'
+    alarmaGrosor: 1,
   },
   /* Posiciones tal como quedaron en el diseño. En porcentaje del plano, que es
      lo que hace que el mapa aguante cualquier ancho de teléfono. */
@@ -98,9 +103,42 @@ const LZ = {
     { id: 'pool', name: 'Piscina',        pool: true,   w: 25,   h: 14.2 },
     { id: 'pump', name: 'Sala de Bombas', pump: true,   w: 6.5,  h: 9.75 },
   ],
-  st: { sel: 'c1', open: false, luces: {}, fuera: new Set(), pend: {}, uz: 1, ux: 0, uy: 0, gest: false, pa: 0.62, pw: 400, listo: false, editar: false, tocado: 'bod' },
+  st: {
+    sel: 'c1', open: false, luces: {}, fuera: new Set(), pend: {},
+    uz: 1, ux: 0, uy: 0, gest: false, pa: 0.62, pw: 400, listo: false,
+    editar: false, tocado: 'bod',
+    /* Las alarmas. `armadas` y `disparadas` vienen de la central; `dibujo` es
+       solo la animación del trazo (0 a 1) y `pend` lo que se está mandando.
+       `conAlarma` es qué edificios TIENEN central: sin esto, El Chueco —que no
+       tiene— enseñaría un botón de armar que no hace nada. */
+    armadas: {}, disparadas: {}, dibujo: {}, alarmaPend: {},
+    conAlarma: new Set(), sosConfirm: false,
+  },
   refs: null,
 };
+
+/* El contorno por el que corre el perímetro. Son los mismos números del diseño:
+   una polilínea que sigue la planta de la cabaña, separada `alarmaSeparacion`
+   puntos hacia afuera, y tres variantes según cómo esté girado el edificio. */
+function lzContornos(sep) {
+  const f = (n) => +n.toFixed(1);
+  const L = f(4.6 - sep), T = f(8 - sep), R1 = f(70 + sep), Y1 = f(21.9 - sep),
+        R2 = f(80.8 + sep), Y2 = f(44.6 - sep), R3 = f(85.7 + sep),
+        GY = f(117.5 + 0.5 * sep), HX = f(71.6 + 0.5 * sep), B = f(133.8 + sep);
+  const pts = [[L,T],[R1,T],[R1,Y1],[R2,Y1],[R2,Y2],[R3,Y2],[R3,GY],[HX,B],[L,B]];
+  const d = (seq) => 'M' + seq.map((p) => p[0] + ' ' + p[1]).join(' L') + ' Z';
+  return {
+    r0:   d([[37, T]].concat(pts.slice(1), [pts[0]])),
+    rm90: d([[R3, 80]].concat(pts.slice(6), pts.slice(0, 6))),
+    r90:  d([[L, 71]].concat(pts)),
+    bodega: (() => {
+      const o = sep * 0.9;
+      const T2 = f(2.3-o), L2 = f(4.6-o), R = f(89.9+o), Bt = f(71.3+o),
+            NX = f(56.5-o), NY = f(41.6+o);
+      return `M47 ${T2} L${R} ${T2} L${R} ${Bt} L${NX} ${Bt} L${NX} ${NY} L${L2} ${NY} L${L2} ${T2} Z`;
+    })(),
+  };
+}
 
 /* Los iconos del panel, dibujados aquí y no traídos de una librería: son un
    trazo cada uno y el panel se usa donde la señal se cae. */
@@ -312,9 +350,19 @@ function lzValores() {
   });
 
   const AMB = '84,168,196';
+  const CONT = lzContornos(P.alarmaSeparacion);
   const edificios = BS.map((b) => {
     const c = cuenta(b);
     const esPP = !!b.pool || !!b.pump;
+    /* El perímetro. Verde armado, rojo disparado; y mientras se arma el trazo
+       se dibuja de 0 a 1 en vez de aparecer entero — que es lo que hace que se
+       lea como "rodeando la casa" y no como un borde que se enciende. */
+    const armada = !!S.armadas[b.id];
+    const disparada = armada && !!S.disparadas[b.id];
+    const aCol = disparada ? '#B3402F' : '#2F7D4E';
+    const pDib = armada ? (S.dibujo[b.id] ?? 1) : 0;
+    const parpadeo = disparada && !(S.open && S.sel === b.id)
+      ? 'animation:lz-blink 0.8s ease-in-out infinite;' : '';
     const techo = b.bodega
       ? 'linear-gradient(180deg,#899094 0%,#7B8187 52%,#666C71 100%)'
       : 'linear-gradient(180deg,#1E5568 0%,#164452 52%,#0F323E 100%)';
@@ -322,6 +370,21 @@ function lzValores() {
     const halo = c ? `drop-shadow(0 0 ${Math.round(10*g)}px rgba(${AMB},${(0.55*g).toFixed(2)})) ` : '';
     return {
       id: b.id, name: b.name, badge: String(c),
+      conAlarma: S.conAlarma.has(b.id),
+      alarmaPathD: b.bodega ? CONT.bodega
+                 : b.rot === -90 ? CONT.rm90 : b.rot === 90 ? CONT.r90 : CONT.r0,
+      alarmaColor: aCol,
+      alarmaSpin: disparada ? '0.45s' : '3.2s',
+      alarmaMaskDash: `${(pDib * 420).toFixed(1)} 420`,
+      alarmaOrbitFx: `opacity:${armada && pDib >= 1 ? 1 : 0};transition:opacity .35s;`,
+      alarmaOrbitDur: disparada ? '5s' : '26s',
+      alarmaLockRot: `rotate(${-(b.rot || 0)})`,
+      /* El anillo de la bodega va pegado a su caja; el de una cabaña se monta
+         sobre el mismo lienzo que el plano, con su misma rotación y escala, para
+         que el trazo caiga justo sobre los muros. */
+      alarmaRingFx: b.bodega
+        ? `position:absolute;inset:-1%;z-index:5;pointer-events:none;overflow:visible;opacity:${armada?1:0};transition:opacity .3s;${parpadeo}`
+        : `position:absolute;left:50%;top:50%;width:480px;aspect-ratio:1054/1492;z-index:5;pointer-events:none;overflow:visible;transform-origin:45% 42.5%;transform:translate(-45%,-42.5%) rotate(${b.rot||0}deg) scale(${((1.37 * S.pw * b.h / 100) / 679).toFixed(4)});opacity:${armada?1:0};transition:opacity .3s;${parpadeo}`,
       box: `position:absolute;left:${b.x}%;top:${b.y}%;width:${b.w}%;aspect-ratio:${(b.w/b.h).toFixed(3)};z-index:${S.open && S.sel===b.id ? 5 : 2};opacity:${S.open && S.sel!==b.id ? 0 : 1};transition:opacity .35s;`,
       planWrap: planos[b.id].wrap, rooms: planos[b.id].rooms,
       tapFx: `position:absolute;inset:-12% 0 -22% 0;z-index:4;background:none;border:none;padding:0;cursor:pointer;pointer-events:${S.open?'none':'auto'};`,
@@ -409,9 +472,56 @@ function lzValores() {
     };
   });
 
+  /* ── La barra de alarmas ────────────────────────────────────────────────── */
+  const conAlarma = ['bod', 'c1', 'c2', 'c3', 'c4'].filter((id) => S.conAlarma.has(id));
+  const todasArmadas = conAlarma.length > 0 && conAlarma.every((id) => S.armadas[id]);
+  const disparadas = BS.filter((b) => S.armadas[b.id] && S.disparadas[b.id]);
+  const selArmada = !!S.armadas[selB.id];
+  const selDisparada = selArmada && !!S.disparadas[selB.id];
+  const selConAlarma = S.conAlarma.has(selB.id);
+  const aFondo = selDisparada ? '#B3402F' : selArmada ? '#2F7D4E' : '#F4F3EC';
+  const aEncendida = selArmada || selDisparada;
+  const estilo = P.alarmaEstilo, gr = P.alarmaGrosor;
+  const iconoAbierto = 'M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3';
+  const iconoCerrado = 'M6 11h12v9H6zM15 11V8a3 3 0 0 0-5.7-1.4';
+
   const sel = cuenta(selB);
   return {
     edificios, planeFx, grupos, total: String(total),
+
+    alarmaW: String(gr),
+    alarmaDash: estilo === 'Continua' ? 'none'
+              : estilo === 'Puntos' ? `0.1 ${(gr * 2.2).toFixed(1)}` : '3 2.2',
+    alarmaCap: estilo === 'Puntos' ? 'round' : 'butt',
+
+    armarTodoWrapFx: `display:${S.open || !conAlarma.length ? 'none' : 'flex'};position:absolute;top:10px;left:10px;z-index:6;align-items:center;gap:6px;`,
+    armarTodoLabel: todasArmadas ? 'Desarmar' : 'Armar',
+    armarTodoIcon: todasArmadas ? iconoAbierto : iconoCerrado,
+    armarTodoFx: `display:inline-flex;align-items:center;gap:5px;background:${todasArmadas?'#2F7D4E':'rgba(244,243,236,0.92)'};color:${todasArmadas?'#F7F6F0':'#2F7D4E'};border:1px solid ${todasArmadas?'#2F7D4E':'rgba(47,125,78,0.45)'};border-radius:999px;padding:8px 11px;font-size:11.5px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(28,28,30,0.12);transition:background .5s ease,color .5s ease,border-color .5s ease,transform .3s cubic-bezier(.22,.8,.32,1);`,
+    /* El SOS pregunta antes. Es el único botón del panel que llama a alguien y
+       hace ruido en cuatro cabañas: un toque sin querer con el teléfono en el
+       bolsillo no puede bastar. */
+    sosConfirm: !!S.sosConfirm,
+    sosFx: `display:${S.sosConfirm ? 'none' : 'inline-flex'};align-items:center;background:#B3402F;color:#F7F6F0;border:none;border-radius:999px;padding:8px 11px;font-size:11.5px;font-weight:900;letter-spacing:0.08em;cursor:pointer;box-shadow:0 4px 14px rgba(179,64,47,0.35);transition:transform .3s cubic-bezier(.22,.8,.32,1);`,
+    sosCajaFx: `display:${S.sosConfirm ? 'flex' : 'none'};align-items:center;gap:4px;background:#B3402F;border-radius:999px;padding:4px 6px;box-shadow:0 4px 14px rgba(179,64,47,0.35);animation:lz-grow .45s cubic-bezier(.22,.8,.32,1);transform-origin:right center;`,
+
+    alarmaHay: selConAlarma,
+    alarmaBtnFx: `display:${selConAlarma?'flex':'none'};align-items:center;gap:10px;flex:none;width:100%;text-align:left;border-radius:12px;padding:12px 14px;cursor:pointer;transition:background .3s,border-color .3s,color .3s;border:1px solid ${aEncendida?aFondo:'#DAD9D0'};background:${aFondo};color:${aEncendida?'#F7F6F0':'#1C1C1E'};${selDisparada?'animation:lz-blink 0.8s ease-in-out infinite;':''}`,
+    alarmaIconFx: `width:34px;height:34px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;background:${aEncendida?'rgba(247,246,240,0.18)':'#E7E6DD'};color:${aEncendida?'#F7F6F0':'#8A8D86'};`,
+    alarmaBtnIcon: aEncendida ? iconoAbierto : iconoCerrado,
+    alarmaSub: S.alarmaPend[selB.id] ? 'Mandando...'
+             : selDisparada ? '¡Alarma activada!'
+             : selArmada ? 'Perímetro armado' : 'Sin protección',
+    alarmaSubFx: `font-size:10.5px;color:${aEncendida?'rgba(247,246,240,0.85)':'#6A6E67'};`,
+    alarmaPill: aEncendida ? 'DESARMAR' : 'ARMAR',
+    alarmaPillFx: `flex:none;font-size:10.5px;font-weight:900;letter-spacing:0.06em;padding:7px 11px;border-radius:999px;background:${aEncendida?'rgba(247,246,240,0.18)':'#17414F'};color:#F7F6F0;`,
+
+    /* La franja de abajo cuando salta una. Ocupa el ancho entero y parpadea a
+       propósito: es lo único de esta pantalla que no puede pasar desapercibido. */
+    toastTexto: disparadas.length
+      ? `Alarma activada · ${disparadas.map((b) => b.name).join(' · ')}` : '',
+    toastZona: disparadas.length ? disparadas[0].id : '',
+    toastFx: `position:absolute;left:0;right:0;bottom:0;z-index:20;display:flex;align-items:center;justify-content:center;gap:8px;background:#B3402F;color:#F7F6F0;border:none;border-radius:14px 14px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom));font-size:13px;font-weight:800;box-shadow:0 6px 20px rgba(179,64,47,0.45);cursor:pointer;opacity:${disparadas.length?1:0};pointer-events:${disparadas.length?'auto':'none'};transform:translateY(${disparadas.length?0:12}px);transition:transform .3s,opacity .3s;${disparadas.length?'animation:lz-blink 0.9s ease-in-out infinite;':''}`,
     selName: selB.name,
     selSub: sel ? `${sel} de ${lzAmbientes(selB).length} luces encendidas` : 'Todas las luces apagadas',
     selOffFx: `display:${sel?'inline-flex':'none'};align-items:center;background:transparent;border:none;border-left:1px solid rgba(28,28,30,0.12);color:#17414F;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;`,
@@ -444,6 +554,31 @@ function lzMontar(caja) {
       <button type="button" data-tap="${e.id}" style="${e.tapFx}" aria-label="${e.name}"></button>
       <div data-label style="${e.label}">${e.name}</div>
       <div data-badge style="${e.badgeFx}">${e.badge}</div>
+      ${!e.conAlarma ? '' : `
+      <svg data-ring viewBox="0 0 100 ${b.bodega ? 75 : 141.6}" preserveAspectRatio="none"
+           style="${e.alarmaRingFx}">
+        <mask id="lzm-${e.id}" maskUnits="userSpaceOnUse" x="-10" y="-10"
+              width="120" height="${b.bodega ? 95 : 162}">
+          <rect x="-10" y="-10" width="120" height="${b.bodega ? 95 : 162}" fill="black"></rect>
+          <path data-ringmask d="${e.alarmaPathD}" pathLength="420" fill="none"
+                stroke="white" stroke-width="7" stroke-dasharray="${e.alarmaMaskDash}"></path>
+        </mask>
+        <path data-ringpath id="lzp-${e.id}" d="${e.alarmaPathD}" pathLength="420" fill="none"
+              stroke="${e.alarmaColor}" stroke-width="${v.alarmaW}"
+              stroke-dasharray="${v.alarmaDash}" stroke-linecap="${v.alarmaCap}"
+              stroke-linejoin="miter" mask="url(#lzm-${e.id})"
+              style="animation:lz-dash ${e.alarmaSpin} linear infinite"></path>
+        <g data-ringorbit style="${e.alarmaOrbitFx}">
+          <animateMotion data-ringdur dur="${e.alarmaOrbitDur}" repeatCount="indefinite">
+            <mpath href="#lzp-${e.id}"></mpath>
+          </animateMotion>
+          <g transform="${e.alarmaLockRot}">
+            <circle data-ringdot r="${b.bodega ? 4 : 4.5}" fill="${e.alarmaColor}"></circle>
+            <path d="M-1.9 -0.6 h3.8 v2.8 h-3.8 z M-1.1 -0.6 v-1 a1.1 1.1 0 0 1 2.2 0 v1"
+                  fill="none" stroke="#F7F6F0" stroke-width="0.9" stroke-linejoin="round"></path>
+          </g>
+        </g>
+      </svg>`}
     </div>`;
   }).join('');
 
@@ -457,7 +592,25 @@ function lzMontar(caja) {
              telefono. La version al lado sirve para saber, de un vistazo, si lo
              que se esta mirando es el codigo de ahora o uno viejo servido por
              la cache. -->
-        <button type="button" id="lz-editar" style="position:absolute;left:10px;top:10px;z-index:6;background:rgba(244,243,236,0.92);border:1px solid #DAD9D0;border-radius:999px;padding:7px 12px;font-size:12px;font-weight:700;color:#17414F;cursor:pointer">✎ Mover</button>
+        <!-- Armar todo y el SOS. Arriba a la izquierda, y solo con el mapa
+             completo: dentro de una cabaña ya está su propio botón. -->
+        <div id="lz-armar-todo-caja" style="${v.armarTodoWrapFx}">
+          <button type="button" id="lz-armar-todo" style="${v.armarTodoFx}">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path id="lz-armar-todo-icono" d="${v.armarTodoIcon}"></path>
+            </svg>
+            <span id="lz-armar-todo-txt">${v.armarTodoLabel}</span>
+          </button>
+          <div id="lz-sos-caja" style="${v.sosCajaFx}">
+            <span style="color:#F7F6F0;font-size:11px;font-weight:700;padding:0 4px">¿Seguro?</span>
+            <button type="button" id="lz-sos-si" style="background:#F7F6F0;color:#B3402F;border:none;border-radius:999px;padding:5px 9px;font-size:10.5px;font-weight:900;cursor:pointer">SÍ</button>
+            <button type="button" id="lz-sos-no" style="background:transparent;color:#F7F6F0;border:1px solid rgba(247,246,240,0.5);border-radius:999px;padding:5px 9px;font-size:10.5px;font-weight:900;cursor:pointer">NO</button>
+          </div>
+          <button type="button" id="lz-sos" style="${v.sosFx}">SOS</button>
+        </div>
+
+        <button type="button" id="lz-editar" style="position:absolute;left:10px;top:52px;z-index:6;background:rgba(244,243,236,0.92);border:1px solid #DAD9D0;border-radius:999px;padding:7px 12px;font-size:12px;font-weight:700;color:#17414F;cursor:pointer">✎ Mover</button>
         <div style="position:absolute;left:12px;bottom:8px;z-index:4;font-size:9px;color:#A5A399;font-weight:600;pointer-events:none">v${LZ_VER}</div>
         <div id="lz-editor" style="display:none"></div>
         <div id="lz-plano" style="position:absolute;inset:0;touch-action:none;${v.planeFx}">
@@ -486,6 +639,12 @@ function lzMontar(caja) {
           <button type="button" id="lz-selof" style="${v.selOffFx}">Apagar</button>
         </div>
         <div id="lz-panel" style="${v.panelFx}"></div>
+        <button type="button" id="lz-toast" style="${v.toastFx}">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+               stroke-width="2.2" stroke-linecap="round"><path d="M12 8v5M12 17v.01"></path>
+            <path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>
+          <span id="lz-toast-txt">${v.toastTexto}</span>
+        </button>
       </div>
     </div>`;
 
@@ -496,6 +655,14 @@ function lzMontar(caja) {
     master: caja.querySelector('#lz-master'),
     btnEditar: caja.querySelector('#lz-editar'),
     editor: caja.querySelector('#lz-editor'),
+    armarCaja:   caja.querySelector('#lz-armar-todo-caja'),
+    armarBtn:    caja.querySelector('#lz-armar-todo'),
+    armarIcono:  caja.querySelector('#lz-armar-todo-icono'),
+    armarTxt:    caja.querySelector('#lz-armar-todo-txt'),
+    sosCaja:     caja.querySelector('#lz-sos-caja'),
+    sosBtn:      caja.querySelector('#lz-sos'),
+    toast:       caja.querySelector('#lz-toast'),
+    toastTxt:    caja.querySelector('#lz-toast-txt'),
     total:  caja.querySelector('#lz-total'),
     barra:  caja.querySelector('#lz-barra'),
     panel:  caja.querySelector('#lz-panel'),
@@ -513,6 +680,12 @@ function lzMontar(caja) {
         label: raiz.querySelector('[data-label]'),
         badge: raiz.querySelector('[data-badge]'),
         rooms: [...raiz.querySelectorAll('[data-room]')],
+        ring:      raiz.querySelector('[data-ring]'),
+        ringMask:  raiz.querySelector('[data-ringmask]'),
+        ringPath:  raiz.querySelector('[data-ringpath]'),
+        ringOrbit: raiz.querySelector('[data-ringorbit]'),
+        ringDur:   raiz.querySelector('[data-ringdur]'),
+        ringDot:   raiz.querySelector('[data-ringdot]'),
       };
     }),
   };
@@ -561,7 +734,32 @@ function lzPintar() {
       el.dataset.k = room.k || '';
       el.firstElementChild.style.cssText = room.fill;
     });
+
+    /* El perímetro. Se cambian atributos y no se rehace el SVG: rehacerlo
+       reiniciaría el `animateMotion` y el candado saltaría al principio del
+       recorrido en cada repintado, que ocurre en cada toque. */
+    if (r.ring) {
+      r.ring.style.cssText = e.alarmaRingFx;
+      r.ringMask.setAttribute('stroke-dasharray', e.alarmaMaskDash);
+      r.ringPath.setAttribute('stroke', e.alarmaColor);
+      r.ringPath.style.animation = `lz-dash ${e.alarmaSpin} linear infinite`;
+      r.ringOrbit.style.cssText = e.alarmaOrbitFx;
+      r.ringDot.setAttribute('fill', e.alarmaColor);
+      if (r.ringDur.getAttribute('dur') !== e.alarmaOrbitDur) {
+        r.ringDur.setAttribute('dur', e.alarmaOrbitDur);
+      }
+    }
   });
+
+  R.armarCaja.style.cssText  = v.armarTodoWrapFx;
+  R.armarBtn.style.cssText   = v.armarTodoFx;
+  R.armarIcono.setAttribute('d', v.armarTodoIcon);
+  R.armarTxt.textContent     = v.armarTodoLabel;
+  R.sosCaja.style.cssText    = v.sosCajaFx;
+  R.sosBtn.style.cssText     = v.sosFx;
+  R.toast.style.cssText      = v.toastFx;
+  R.toastTxt.textContent     = v.toastTexto;
+  R.toast.dataset.zona       = v.toastZona;
 
   lzPintarPanel(v);
   lzPintarEditor();
@@ -593,7 +791,23 @@ function lzPintarPanelInterno(v) {
       + 'interruptores asignados (' + lzEsc(LZ.st.sel) + ').</div>';
     return;
   }
-  LZ.refs.panel.innerHTML = v.grupos.map((gp) => `
+  /* La alarma va ARRIBA del todo en el panel, antes que las luces. Es lo que se
+     viene a hacer aquí cuando se viene a hacer algo serio. */
+  const alarma = !v.alarmaHay ? '' : `
+    <div data-alarma-btn style="${v.alarmaBtnFx}">
+      <div style="${v.alarmaIconFx}">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="${v.alarmaBtnIcon}"></path></svg>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13.5px;font-weight:700">Alarma</div>
+        <div style="${v.alarmaSubFx}">${v.alarmaSub}</div>
+      </div>
+      <div style="${v.alarmaPillFx}">${v.alarmaPill}</div>
+    </div>`;
+
+  LZ.refs.panel.innerHTML = alarma + v.grupos.map((gp) => `
     <div style="background:#F4F3EC;border:1px solid #DAD9D0;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:12px;flex:none">
       <div style="display:flex;align-items:center;gap:10px">
         <div style="${gp.chip}">
@@ -769,21 +983,79 @@ function lzPintarEditor() {
 
 /* ── Los aparatos ────────────────────────────────────────────────────────── */
 async function lzCargarEstado() {
+  /* Qué edificios tienen central. Se pregunta a la base y no se da por hecho:
+     El Chueco no tiene, y enseñarle un botón de armar que no acciona nada es
+     peor que no enseñar ninguno — la próxima vez que de verdad haga falta, ya
+     no se sabe si está armada o si el botón nunca sirvió. */
+  try {
+    const al = await VA_PANEL.api('dispositivos?tipo=eq.alarma&activo=is.true&select=zona');
+    LZ.st.conAlarma = new Set((al || []).map((a) => a.zona).filter(Boolean));
+  } catch (e) { LZ.st.conAlarma = new Set(); }
+
   try {
     const d = await VA_PANEL.elLlamar('estado');
-    const luces = {};
+    const luces = {}, armadas = {}, disparadas = {};
     LZ.edificios.forEach((b) => { luces[b.id] = {}; });
     Object.keys(d.luces || {}).forEach((k) => {
       const [zona, clave] = k.split(':');
+      if (clave === 'alarma') { armadas[zona] = !!d.luces[k]; return; }
       if (luces[zona]) luces[zona][clave] = !!d.luces[k];
     });
+    (d.disparadas || []).forEach((k) => { disparadas[k.split(':')[0]] = true; });
+
+    /* El trazo del perímetro solo se anima al armar desde aquí. Lo que ya
+       estaba armado al entrar sale dibujado entero: ver cuatro perímetros
+       trazándose cada vez que se abre la pantalla convierte una señal en
+       decoración. */
+    const dibujo = {};
+    Object.keys(armadas).forEach((z) => { if (armadas[z]) dibujo[z] = 1; });
+
     LZ.st.luces = luces;
+    LZ.st.armadas = armadas;
+    LZ.st.disparadas = disparadas;
+    LZ.st.dibujo = dibujo;
     LZ.st.fuera = new Set(d.fuera || []);
     LZ.st.listo = true;
   } catch (e) {
     LZ.st.listo = false;
     throw e;
   }
+}
+
+/* El trazo dibujándose. Milímetro a milímetro y no de golpe: armar una alarma
+   es un acto con consecuencias y merece que se vea ocurrir. */
+function lzAnimarPerimetro(zona) {
+  const t0 = performance.now(), dur = 1300, espera = 320;
+  const paso = (ahora) => {
+    if (!LZ.st.armadas[zona]) return;
+    const p = Math.min(1, Math.max(0, (ahora - t0 - espera) / dur));
+    LZ.st.dibujo[zona] = 1 - Math.pow(1 - p, 2);
+    lzPintar();
+    if (p < 1) requestAnimationFrame(paso);
+  };
+  requestAnimationFrame(paso);
+}
+
+/* Armar o desarmar de verdad. Igual que las luces: no se pinta armado hasta que
+   la central lo confirma. */
+async function lzAlarma(zona, armar) {
+  if (!zona || LZ.st.alarmaPend[zona]) return;
+  if (!armar && !confirm('Desarmar esta alarma?')) return;
+  LZ.st.alarmaPend[zona] = true;
+  lzPintar();
+  try {
+    await VA_PANEL.elLlamar('accion', { zona, clave: 'alarma', accion: armar ? 'on' : 'off' });
+    LZ.st.armadas[zona] = armar;
+    if (armar) { LZ.st.dibujo[zona] = 0; } else { delete LZ.st.dibujo[zona]; LZ.st.disparadas[zona] = false; }
+    delete LZ.st.alarmaPend[zona];
+    lzPintar();
+    if (armar) lzAnimarPerimetro(zona);
+    return;
+  } catch (e) {
+    VA_PANEL.avisar(e.message, 'error');
+  }
+  delete LZ.st.alarmaPend[zona];
+  lzPintar();
 }
 
 /* Encender o apagar un ambiente.
@@ -835,6 +1107,45 @@ async function lzVarios(pares, accion) {
 /* ── Toques ──────────────────────────────────────────────────────────────── */
 document.addEventListener('click', (e) => {
   if (!LZ.refs || !LZ.refs.caja.contains(e.target)) return;
+
+  /* ── Alarmas ── */
+  if (e.target.closest('[data-alarma-btn]')) {
+    lzAlarma(LZ.st.sel, !LZ.st.armadas[LZ.st.sel]);
+    return;
+  }
+  if (e.target.closest('#lz-armar-todo')) {
+    const zonas = [...LZ.st.conAlarma];
+    const todas = zonas.every((z) => LZ.st.armadas[z]);
+    zonas.forEach((z) => lzAlarma(z, !todas));
+    return;
+  }
+  if (e.target.closest('#lz-sos')) {
+    LZ.st.sosConfirm = true;
+    lzPintar();
+    clearTimeout(LZ._sosT);
+    /* La confirmacion se retira sola. Un "¿seguro?" que se queda en pantalla
+       acaba pulsado sin querer al volver a mirar el telefono. */
+    LZ._sosT = setTimeout(() => { LZ.st.sosConfirm = false; lzPintar(); }, 5000);
+    return;
+  }
+  if (e.target.closest('#lz-sos-no')) {
+    clearTimeout(LZ._sosT);
+    LZ.st.sosConfirm = false;
+    lzPintar();
+    return;
+  }
+  if (e.target.closest('#lz-sos-si')) {
+    clearTimeout(LZ._sosT);
+    LZ.st.sosConfirm = false;
+    [...LZ.st.conAlarma].forEach((z) => lzAlarma(z, true));
+    lzPintar();
+    return;
+  }
+  if (e.target.closest('#lz-toast')) {
+    const z = LZ.refs.toast.dataset.zona;
+    if (z) { Object.assign(LZ.st, { sel: z, open: true, uz: 1, ux: 0, uy: 0 }); lzPintar(); }
+    return;
+  }
 
   /* ── Modo mover ── */
   if (e.target.closest('#lz-editar')) {

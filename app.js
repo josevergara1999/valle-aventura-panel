@@ -3319,7 +3319,7 @@ async function pintarLuces() {
      ni sale en el plano, pero hay noches que se usa sin turno y el boton tiene
      que estar en alguna parte. */
   if (!caja.querySelector("#lz-host")) {
-    caja.innerHTML = '<div id="lz-host"></div><div id="lz-tinaja"></div><div id="lz-alarmas"></div>';
+    caja.innerHTML = '<div id="lz-host"></div><div id="lz-tinaja"></div>';
     LZ.refs = null;
   }
 
@@ -3332,48 +3332,7 @@ async function pintarLuces() {
   lzMedir();
   lzPintar();
   await pintarTinaja(caja.querySelector("#lz-tinaja"));
-  await pintarAlarmas(caja.querySelector("#lz-alarmas"));
-}
 
-/* Las alarmas, debajo de todo.
-   Van al final y no en el mapa a proposito: una alarma no es un ambiente que se
-   ilumina, es un estado de la cabania entera, y meterla como una luz mas del
-   plano invitaria a tocarla de pasada. Aqui hay que bajar a buscarla.
-
-   Y por eso desarmar pregunta y armar no: dejar una cabania sin vigilancia sin
-   querer es el error que cuesta; armarla de mas no le pasa nada a nadie. */
-async function pintarAlarmas(caja) {
-  if (!caja) return;
-  let alarmas = [];
-  try {
-    alarmas = await api("dispositivos?tipo=eq.alarma&activo=is.true"
-                      + "&select=nombre,zona,cabana_id,en_linea&order=nombre");
-  } catch (e) { alarmas = []; }
-  if (!alarmas.length) { caja.innerHTML = ""; return; }
-
-  caja.innerHTML = `
-    <h2 class="titulo-seccion" style="margin-top:22px">Alarmas</h2>
-    ${alarmas.map((a) => {
-      const donde = a.cabana_id ? nombreCabana(a.cabana_id) : esc(a.nombre);
-      const armada = !!(a.zona && LZ.st.luces[a.zona] && LZ.st.luces[a.zona].alarma);
-      const sinSenal = a.en_linea === false
-                    || (a.zona && LZ.st.fuera.has(`${a.zona}:alarma`));
-      return `<div class="tarjeta luz-tarjeta${armada ? " ocupada" : ""}">
-        <div class="luz-cab">
-          <b>${esc(donde)}</b>
-          <span class="luz-nota">${sinSenal ? "no responde"
-            : (armada ? "armada" : "desarmada")}</span>
-        </div>
-        <div class="fila">
-          <button type="button" class="secundario"
-                  data-alarma="${esc(a.zona || "")}" data-acc="off">Desarmar</button>
-          <button type="button"
-                  data-alarma="${esc(a.zona || "")}" data-acc="on">Armar</button>
-        </div>
-      </div>`;
-    }).join("")}
-    <p class="av-nota">Se piden a SmartLife al abrir esta pantalla. Si una dice
-      que no responde, esta sin senal — no desarmada.</p>`;
 }
 
 /* La tinaja, debajo del mapa. No es una luz y no sale en el plano, pero dice a
@@ -3403,26 +3362,6 @@ async function pintarTinaja(caja) {
 }
 
 document.addEventListener("click", async (e) => {
-  const al = e.target.closest("[data-alarma]");
-  if (al) {
-    const zona = al.dataset.alarma;
-    const acc = al.dataset.acc;
-    /* Desarmar pregunta; armar no. Dejar una cabania sin vigilancia sin querer
-       es el error que cuesta — armarla de mas no le pasa nada a nadie. */
-    if (acc === "off" && !confirm("Desarmar esta alarma?")) return;
-    const antes = al.textContent;
-    al.disabled = true;
-    al.textContent = "...";
-    try {
-      await elLlamar("accion", { zona, clave: "alarma", accion: acc });
-      avisar(acc === "on" ? "Alarma armada." : "Alarma desarmada.", "ok");
-      pintarLuces();
-    } catch (err) { avisar(err.message, "error"); }
-    al.disabled = false;
-    al.textContent = antes;
-    return;
-  }
-
   const b = e.target.closest("[data-luz]");
   if (!b) return;
   const cab = b.dataset.luz;

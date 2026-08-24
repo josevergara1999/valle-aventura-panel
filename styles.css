@@ -1292,3 +1292,11 @@ body.en-luces main   { padding: 0; max-width: none; }
   .el-ap { grid-template-columns: 1fr 1fr; }
   .el-ap-nombre { grid-column: 1 / -1; }
 }
+
+/* ── El perímetro de alarma ─────────────────────────────────────────────────
+   Las tres animaciones que pide el diseño del mapa. Van aquí y no en línea
+   porque `@keyframes` no se puede escribir en un atributo `style`. */
+@keyframes lz-dash  { to { stroke-dashoffset: -10.4 } }
+@keyframes lz-blink { 0%, 100% { opacity: 1 } 50% { opacity: 0.4 } }
+@keyframes lz-grow  { from { transform: scale(0.92); opacity: 0 }
+                      to   { transform: scale(1);    opacity: 1 } }
