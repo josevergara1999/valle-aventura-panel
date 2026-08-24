@@ -39,7 +39,7 @@ const LZ_PROP = 390 / 844;
 /* Se enseña en una esquina del mapa. Parece una tontería y no lo es: sin esto,
    "sigo viendo lo de antes" y "no se subió el cambio" son indistinguibles desde
    fuera, y se pierde media hora adivinando cuál de los dos es. */
-const LZ_VER = 19;
+const LZ_VER = 20;
 
 /* ── Posiciones movidas a mano ─────────────────────────────────────────────
    Mandan sobre las del diseño. Existen para que mover un edificio dos puntos a
@@ -197,7 +197,7 @@ const LZ_GRUPOS = {
        mejor un grupo que existe que uno que nunca se va a poder tocar.
        Se llama SmartLife porque es la otra nube, y saberlo importa cuando algo
        no responde: no es el mismo sitio al que ir a mirar. */
-    { name: 'SmartLife', icon: LZ_IC.agua, tinaja: true, ch: [['tinaja','Canal1']] },
+    { name: 'Tinaja - SmartLife', icon: LZ_IC.agua, tinaja: true, ch: [['tinaja','Canal1']] },
   ],
 };
 
