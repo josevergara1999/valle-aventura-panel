@@ -39,7 +39,7 @@ const LZ_PROP = 390 / 844;
 /* Se enseña en una esquina del mapa. Parece una tontería y no lo es: sin esto,
    "sigo viendo lo de antes" y "no se subió el cambio" son indistinguibles desde
    fuera, y se pierde media hora adivinando cuál de los dos es. */
-const LZ_VER = 11;
+const LZ_VER = 12;
 
 /* ── Posiciones movidas a mano ─────────────────────────────────────────────
    Mandan sobre las del diseño. Existen para que mover un edificio dos puntos a
@@ -513,6 +513,9 @@ function lzValores() {
              : selDisparada ? '¡Alarma activada!'
              : selArmada ? 'Perímetro armado' : 'Sin protección',
     alarmaSubFx: `font-size:10.5px;color:${aEncendida?'rgba(247,246,240,0.85)':'#6A6E67'};`,
+    /* El SOS de la cabaña desaparece cuando ya está sonando: pulsarlo otra vez
+       no haría nada y el sitio lo necesita el botón de desarmar. */
+    sosZonaFx: `display:${selDisparada ? 'none' : 'inline-flex'};flex:none;font-size:11px;font-weight:900;letter-spacing:0.1em;padding:8px 12px;margin-right:8px;border-radius:999px;cursor:pointer;border:none;color:#F7F6F0;background:#B3402F;box-shadow:0 2px 8px rgba(179,64,47,0.4);`,
     alarmaPill: aEncendida ? 'DESARMAR' : 'ARMAR',
     alarmaPillFx: `flex:none;font-size:10.5px;font-weight:900;letter-spacing:0.06em;padding:7px 11px;border-radius:999px;background:${aEncendida?'rgba(247,246,240,0.18)':'#17414F'};color:#F7F6F0;`,
 
@@ -554,7 +557,13 @@ function lzMontar(caja) {
       <button type="button" data-tap="${e.id}" style="${e.tapFx}" aria-label="${e.name}"></button>
       <div data-label style="${e.label}">${e.name}</div>
       <div data-badge style="${e.badgeFx}">${e.badge}</div>
-      ${!e.conAlarma ? '' : `
+      ${b.pool || b.pump ? '' : `
+      <!-- El anillo se crea SIEMPRE para los edificios que tienen contorno, y se
+           enseña o no por opacidad. Antes se creaba solo si el edificio tenía
+           central, pero eso se sabe después de montar el mapa: en ese momento la
+           lista estaba vacía, no se dibujaba ninguno, y no volvía a intentarse.
+           Un elemento invisible cuesta nada; uno que no existe no se puede
+           encender más tarde. -->
       <svg data-ring viewBox="0 0 100 ${b.bodega ? 75 : 141.6}" preserveAspectRatio="none"
            style="${e.alarmaRingFx}">
         <mask id="lzm-${e.id}" maskUnits="userSpaceOnUse" x="-10" y="-10"
@@ -804,6 +813,10 @@ function lzPintarPanelInterno(v) {
         <div style="font-size:13.5px;font-weight:700">Alarma</div>
         <div style="${v.alarmaSubFx}">${v.alarmaSub}</div>
       </div>
+      <!-- El SOS de esta cabaña: hace sonar SU sirena, no las cuatro. Va dentro
+           de la fila y no suelto por el panel porque solo tiene sentido junto al
+           edificio al que pertenece. -->
+      <button type="button" data-sos-zona="${lzEsc(LZ.st.sel)}" style="${v.sosZonaFx}">SOS</button>
       <div style="${v.alarmaPillFx}">${v.alarmaPill}</div>
     </div>`;
 
@@ -1038,18 +1051,27 @@ function lzAnimarPerimetro(zona) {
 
 /* Armar o desarmar de verdad. Igual que las luces: no se pinta armado hasta que
    la central lo confirma. */
-async function lzAlarma(zona, armar) {
+async function lzAlarma(zona, que) {
   if (!zona || LZ.st.alarmaPend[zona]) return;
+  const sos = que === 'sos';
+  const armar = sos || que === true;
   if (!armar && !confirm('Desarmar esta alarma?')) return;
+
   LZ.st.alarmaPend[zona] = true;
   lzPintar();
   try {
-    await VA_PANEL.elLlamar('accion', { zona, clave: 'alarma', accion: armar ? 'on' : 'off' });
+    await VA_PANEL.elLlamar('accion',
+      { zona, clave: 'alarma', accion: sos ? 'sos' : (armar ? 'on' : 'off') });
+    const yaEstaba = !!LZ.st.armadas[zona];
     LZ.st.armadas[zona] = armar;
-    if (armar) { LZ.st.dibujo[zona] = 0; } else { delete LZ.st.dibujo[zona]; LZ.st.disparadas[zona] = false; }
+    LZ.st.disparadas[zona] = sos;
+    if (armar) { if (!yaEstaba) LZ.st.dibujo[zona] = 0; }
+    else { delete LZ.st.dibujo[zona]; }
     delete LZ.st.alarmaPend[zona];
     lzPintar();
-    if (armar) lzAnimarPerimetro(zona);
+    /* Solo se traza si no estaba armada ya: disparar el SOS de una cabaña que
+       llevaba media hora armada no tiene por qué redibujarle el perímetro. */
+    if (armar && !yaEstaba) lzAnimarPerimetro(zona);
     return;
   } catch (e) {
     VA_PANEL.avisar(e.message, 'error');
@@ -1109,6 +1131,18 @@ document.addEventListener('click', (e) => {
   if (!LZ.refs || !LZ.refs.caja.contains(e.target)) return;
 
   /* ── Alarmas ── */
+  const sosZ = e.target.closest('[data-sos-zona]');
+  if (sosZ) {
+    /* Se para aquí para que el toque no llegue a la fila y acabe armando o
+       desarmando de paso. */
+    e.stopPropagation();
+    const z = sosZ.dataset.sosZona;
+    const donde = LZ.edificios.find((x) => x.id === z);
+    if (confirm(`Hacer sonar la sirena de ${donde ? donde.name : 'esta cabaña'}?`)) {
+      lzAlarma(z, 'sos');
+    }
+    return;
+  }
   if (e.target.closest('[data-alarma-btn]')) {
     lzAlarma(LZ.st.sel, !LZ.st.armadas[LZ.st.sel]);
     return;
@@ -1137,7 +1171,7 @@ document.addEventListener('click', (e) => {
   if (e.target.closest('#lz-sos-si')) {
     clearTimeout(LZ._sosT);
     LZ.st.sosConfirm = false;
-    [...LZ.st.conAlarma].forEach((z) => lzAlarma(z, true));
+    [...LZ.st.conAlarma].forEach((z) => lzAlarma(z, 'sos'));
     lzPintar();
     return;
   }

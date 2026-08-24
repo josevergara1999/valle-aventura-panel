@@ -341,7 +341,7 @@ const accionar = (dev: Aparato, accion: string) => {
        son la misma intención desde el panel, así que se traduce aquí y no se
        inventa una segunda acción que el resto del código tendría que conocer. */
     const valor = codigo === 'master_mode'
-      ? (accion === 'on' ? 'arm' : 'disarmed')
+      ? (accion === 'sos' ? 'sos' : accion === 'on' ? 'arm' : 'disarmed')
       : accion === 'on';
     return tuya(`/v1.0/devices/${dev.device_id ?? dev.id}/commands`, 'POST',
       { commands: [{ code: codigo, value: valor }] });
@@ -701,7 +701,7 @@ async function estado() {
 /* Encender o apagar ahora, desde el panel. A diferencia de /cron, esto SÍ
    recibe qué y a qué, y por eso exige sesión. */
 async function accion(body: { dispositivo?: string; cabana?: string; rol?: string; accion: string }) {
-  if (body.accion !== 'on' && body.accion !== 'off') throw new Error('Acción desconocida.');
+  if (!['on', 'off', 'sos'].includes(body.accion)) throw new Error('Acción desconocida.');
 
   let filtro = '';
   if (body.dispositivo) filtro = `id=eq.${body.dispositivo}`;
