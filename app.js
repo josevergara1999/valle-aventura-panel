@@ -3532,8 +3532,12 @@ async function elAjustes(caja) {
     bus.disabled = true;
     bus.textContent = "Buscando...";
     try {
-      await elLlamar("dispositivos");
-      avisar("Listado actualizado.", "ok");
+      const r = await elLlamar("dispositivos");
+      /* Si una de las dos nubes falla, la otra sigue trayendo aparatos y el
+         listado "funciona". Ese es justo el fallo que se pasa por alto tres
+         horas, asi que lo que salio mal se dice aqui y no en un registro. */
+      if (r?.avisos?.length) avisar(r.avisos.join(" · "), "error");
+      else avisar("Listado actualizado.", "ok");
       await pintarAvisos();
       return;
     } catch (e) { avisar(e.message, "error"); }

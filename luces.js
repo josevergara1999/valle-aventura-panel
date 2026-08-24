@@ -39,7 +39,7 @@ const LZ_PROP = 390 / 844;
 /* Se enseña en una esquina del mapa. Parece una tontería y no lo es: sin esto,
    "sigo viendo lo de antes" y "no se subió el cambio" son indistinguibles desde
    fuera, y se pierde media hora adivinando cuál de los dos es. */
-const LZ_VER = 9;
+const LZ_VER = 10;
 
 /* ── Posiciones movidas a mano ─────────────────────────────────────────────
    Mandan sobre las del diseño. Existen para que mover un edificio dos puntos a

@@ -494,6 +494,10 @@ async function dispositivos() {
 
   const ahora = new Date().toISOString();
   const filas = [];
+  /* Lo que salió mal sin llegar a tumbar el listado. Sube al panel en vez de
+     quedarse en un registro: un fallo que no se ve es un fallo que se busca a
+     ciegas tres horas después. */
+  const avisos: string[] = [];
 
   for (const dev of lista) {
     /* El id de la sala NO viene suelto en el aparato: viaja dentro de `family`,
@@ -545,16 +549,43 @@ async function dispositivos() {
   /* Y ahora los de SmartLife, a la misma lista. Si esa cuenta no está conectada
      todavía, se sigue: media lista es mejor que un error que deja al panel sin
      ninguna. */
-  try {
-    const c = (await sb('smartlife_cuenta?id=eq.1&select=uid'))?.[0];
-    const d2 = c?.uid
-      ? await tuya(`/v1.0/users/${c.uid}/devices`)
-      : (await tuya('/v1.3/iot-03/devices?page_size=100'))?.list;
-    console.log('SmartLife devolvio', Array.isArray(d2) ? d2.length : 0, 'aparatos');
-    for (const dev of (d2 ?? [])) filas.push(...tuyaFilas(dev, ahora));
-  } catch (e) {
-    console.error('smartlife:', (e as Error).message);
+  /* Tuya tiene tres formas de pedir "los aparatos de la cuenta enlazada" y cuál
+     funciona depende de qué APIs tenga suscrito el proyecto. Se prueban en
+     orden en vez de elegir una a ciegas: la primera es la pensada para cuentas
+     enlazadas por QR, que es nuestro caso.
+
+     Y si fallan las tres, el error SUBE. Antes se anotaba en un registro que no
+     mira nadie y la función devolvía la lista de eWeLink como si todo hubiera
+     ido bien — por eso los aparatos de SmartLife "no aparecían" sin que nada
+     dijera por qué. */
+  const intentos: Array<[string, (r: unknown) => unknown[]]> = [
+    ['/v1.0/iot-01/associated-users/devices?page_size=100',
+      (r) => (r as { devices?: unknown[] })?.devices ?? []],
+    ['/v1.3/iot-03/devices?page_size=100',
+      (r) => (r as { list?: unknown[] })?.list ?? []],
+  ];
+  const cuentaTuya = (await sb('smartlife_cuenta?id=eq.1&select=uid'))?.[0];
+  if (cuentaTuya?.uid) {
+    intentos.push([`/v1.0/users/${cuentaTuya.uid}/devices`, (r) => (r as unknown[]) ?? []]);
   }
+
+  let listaTuya: unknown[] = [];
+  const fallos: string[] = [];
+  for (const [ruta, sacar] of intentos) {
+    try {
+      const r = await tuya(ruta);
+      listaTuya = sacar(r);
+      console.log('SmartLife por', ruta, '->', listaTuya.length, 'aparatos');
+      if (listaTuya.length) break;
+      fallos.push(`${ruta}: sin aparatos`);
+    } catch (e) {
+      fallos.push(`${ruta}: ${(e as Error).message}`);
+    }
+  }
+  for (const dev of listaTuya) {
+    filas.push(...tuyaFilas(dev as Parameters<typeof tuyaFilas>[0], ahora));
+  }
+  if (!listaTuya.length) avisos.push('SmartLife: ' + fallos.join(' | '));
 
   if (filas.length) {
     await sb('dispositivos?on_conflict=id', {
@@ -574,7 +605,8 @@ async function dispositivos() {
     });
   } catch (e) { console.error('marcar alarmas:', (e as Error).message); }
 
-  return await sb('dispositivos?select=*&order=sala.asc.nullslast,nombre.asc');
+  const guardados = await sb('dispositivos?select=*&order=sala.asc.nullslast,nombre.asc');
+  return { lista: guardados, avisos };
 }
 
 /* El estado real de cada ambiente del mapa.
