@@ -273,6 +273,37 @@ async function tuyaToken(): Promise<{ at: string; region: string }> {
   return { at: d.result.access_token, region };
 }
 
+/* Pedirle a Tuya los aparatos de la cuenta enlazada.
+ *
+ * Hay tres rutas posibles y cuál sirve depende de qué APIs tenga suscrito el
+ * proyecto, así que se prueban en orden empezando por la de cuentas enlazadas
+ * por QR, que es nuestro caso. Vive aquí y no dentro de una sola función porque
+ * la usan dos —listar y leer estado— y tenerlo duplicado ya costó una ronda:
+ * se arregló la ruta al listar y se quedó la vieja al leer, así que los
+ * aparatos aparecían pero todos como "no responde". */
+async function tuyaAparatos(): Promise<{ lista: unknown[]; fallos: string[] }> {
+  const rutas: Array<[string, (r: unknown) => unknown[]]> = [
+    ['/v1.0/iot-01/associated-users/devices?page_size=100',
+      (r) => (r as { devices?: unknown[] })?.devices ?? []],
+    ['/v1.3/iot-03/devices?page_size=100',
+      (r) => (r as { list?: unknown[] })?.list ?? []],
+  ];
+  const c = (await sb('smartlife_cuenta?id=eq.1&select=uid'))?.[0];
+  if (c?.uid) rutas.push([`/v1.0/users/${c.uid}/devices`, (r) => (r as unknown[]) ?? []]);
+
+  const fallos: string[] = [];
+  for (const [ruta, sacar] of rutas) {
+    try {
+      const lista = sacar(await tuya(ruta));
+      if (lista.length) return { lista, fallos };
+      fallos.push(`${ruta}: sin aparatos`);
+    } catch (e) {
+      fallos.push(`${ruta}: ${(e as Error).message}`);
+    }
+  }
+  return { lista: [], fallos };
+}
+
 async function tuya(ruta: string, metodo = 'GET', cuerpo?: unknown) {
   const { at, region } = await tuyaToken();
   const txt = cuerpo ? JSON.stringify(cuerpo) : '';
@@ -558,30 +589,7 @@ async function dispositivos() {
      mira nadie y la función devolvía la lista de eWeLink como si todo hubiera
      ido bien — por eso los aparatos de SmartLife "no aparecían" sin que nada
      dijera por qué. */
-  const intentos: Array<[string, (r: unknown) => unknown[]]> = [
-    ['/v1.0/iot-01/associated-users/devices?page_size=100',
-      (r) => (r as { devices?: unknown[] })?.devices ?? []],
-    ['/v1.3/iot-03/devices?page_size=100',
-      (r) => (r as { list?: unknown[] })?.list ?? []],
-  ];
-  const cuentaTuya = (await sb('smartlife_cuenta?id=eq.1&select=uid'))?.[0];
-  if (cuentaTuya?.uid) {
-    intentos.push([`/v1.0/users/${cuentaTuya.uid}/devices`, (r) => (r as unknown[]) ?? []]);
-  }
-
-  let listaTuya: unknown[] = [];
-  const fallos: string[] = [];
-  for (const [ruta, sacar] of intentos) {
-    try {
-      const r = await tuya(ruta);
-      listaTuya = sacar(r);
-      console.log('SmartLife por', ruta, '->', listaTuya.length, 'aparatos');
-      if (listaTuya.length) break;
-      fallos.push(`${ruta}: sin aparatos`);
-    } catch (e) {
-      fallos.push(`${ruta}: ${(e as Error).message}`);
-    }
-  }
+  const { lista: listaTuya, fallos } = await tuyaAparatos();
   for (const dev of listaTuya) {
     filas.push(...tuyaFilas(dev as Parameters<typeof tuyaFilas>[0], ahora));
   }
@@ -595,10 +603,13 @@ async function dispositivos() {
     });
   }
   /* Una alarma se reconoce sola por su mando, así que se marca aquí en vez de
-     hacerte elegirlo en un desplegable. Solo las que siguen "sin usar": si
-     alguna se cambió a mano, esa decisión manda. */
+     hacerte elegirlo en un desplegable.
+     `activo=is.true` no sobra: es lo que distingue "todavía no lo he mirado" de
+     "no lo quiero". Sin ese filtro, las alarmas de la veterinaria —apagadas a
+     mano a propósito— se volvían a marcar solas en cada listado, porque desde
+     aquí una exclusión deliberada y un aparato sin etiquetar se ven idénticos. */
   try {
-    await sb('dispositivos?codigo=eq.master_mode&tipo=eq.otro', {
+    await sb('dispositivos?codigo=eq.master_mode&tipo=eq.otro&activo=is.true', {
       method: 'PATCH',
       headers: { Prefer: 'return=minimal' },
       body: JSON.stringify({ tipo: 'alarma' }),
@@ -639,11 +650,9 @@ async function estado() {
   const tEstado: Record<string, Record<string, unknown>> = {};
   const tLinea: Record<string, boolean> = {};
   try {
-    const c = (await sb('smartlife_cuenta?id=eq.1&select=uid'))?.[0];
-    const lista = c?.uid
-      ? await tuya(`/v1.0/users/${c.uid}/devices`)
-      : (await tuya('/v1.3/iot-03/devices?page_size=100'))?.list;
-    for (const dev of (lista ?? [])) {
+    const { lista } = await tuyaAparatos();
+    for (const d2 of lista) {
+      const dev = d2 as { id: string; online?: boolean; status?: Array<{ code: string; value: unknown }> };
       const m: Record<string, unknown> = {};
       for (const s of (dev.status ?? [])) m[s.code] = s.value;
       tEstado[dev.id] = m;
