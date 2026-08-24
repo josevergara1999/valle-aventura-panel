@@ -1943,12 +1943,13 @@ function detalleReserva(b, idPrecio, opciones = {}) {
     ${esBloqueo ? "" : fila("Tinaja", !b.tinaja ? ""
        : b.tinaja_fecha
          ? `${fechaCorta(b.tinaja_fecha)} &middot; ${hhmm(b.tinaja_hora)} — ${horaFin(b.tinaja_hora)}`
-           /* Solo si hay una tinaja etiquetada de verdad. Prometer "se enciende
-              sola" sin aparato detras seria peor que no decir nada: dejarias de
-              subir a encenderla. */
-           + (el.estado?.conectado && el.hayTinaja
-              ? `<br><span style="color:var(--tx-3);font-size:12px">se enciende sola a las ${
-                   horaMenos(b.tinaja_hora, st.reglas?.tinaja_antes_min ?? 120)}</span>`
+           /* La tinaja no se enciende sola: llega un aviso al telefono y la
+              enciende una persona. Aqui se dice a que hora avisa, que es la
+              hora a la que hay que estar disponible — no "se enciende sola",
+              que haria dejar de mirarlo. */
+           + (el.hayTinaja
+              ? `<br><span style="color:var(--tx-3);font-size:12px">aviso para encenderla a las ${
+                   horaMenos(b.tinaja_hora, st.reglas?.tinaja_antes_min ?? 720)}</span>`
               : "")
          /* Cobrada pero sin turno: no se deja en blanco, que un vacio no se
             distingue de un "no lleva tinaja". */
@@ -3426,8 +3427,10 @@ async function elAjustes(caja) {
           </div>`).join("")
         : '<p class="lista-vacia">Toca <b>Buscar aparatos</b> y salen los de tu cuenta de eWeLink, con el nombre que tienen alli.</p>'}
       </div>
-      <p class="av-nota">La tinaja se enciende sola ${st.reglas?.tinaja_antes_min ?? 120} minutos
-        antes del turno que apruebes, y se apaga al terminar. Si no enciende, te llega un aviso.</p>`}`);
+      <p class="av-nota">La tinaja no se enciende sola. Al aprobar un turno se
+        programa un aviso al telefono ${Math.round((st.reglas?.tinaja_antes_min ?? 720) / 60)} horas
+        antes, que es lo que tarda en temperar, y la enciendes tu desde
+        <b>Luces &rsaquo; Sala de Bombas</b>.</p>`}`);
 
   const con = $("#el-conectar");
   if (con) con.addEventListener("click", async () => {

@@ -39,7 +39,7 @@ const LZ_PROP = 390 / 844;
 /* Se enseña en una esquina del mapa. Parece una tontería y no lo es: sin esto,
    "sigo viendo lo de antes" y "no se subió el cambio" son indistinguibles desde
    fuera, y se pierde media hora adivinando cuál de los dos es. */
-const LZ_VER = 18;
+const LZ_VER = 19;
 
 /* ── Posiciones movidas a mano ─────────────────────────────────────────────
    Mandan sobre las del diseño. Existen para que mover un edificio dos puntos a
@@ -453,12 +453,12 @@ function lzValores() {
     const alguna = nOn > 0;
     return {
       name: gp.name, icon: gp.icon,
-      /* La tinaja dice a qué hora se enciende sola en vez de "Apagado". Es la
-         única de estas llaves que tiene una cita puesta, y saberlo es lo que
-         evita subir a encenderla por si acaso. */
+      /* La tinaja dice a qué hora la esperan en vez de "Apagado". Ya no se
+         enciende sola —el aviso llega al teléfono y la enciendes tú— así que lo
+         útil aquí es la cita, no lo que iba a hacer una máquina. */
       sub: gp.off ? 'Desconectado'
          : (gp.tinaja && !alguna && S.proxTinaja)
-           ? `se enciende sola ${S.proxTinaja}`
+           ? S.proxTinaja
          : (alguna ? `${nOn} de ${gp.ch.length} encendida${nOn===1?'':'s'}` : 'Apagado'),
       chip: `width:34px;height:34px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;transition:background .25s,color .25s;background:${alguna?'rgba(23,65,79,0.10)':'#E7E6DD'};color:${alguna?'#17414F':'#8A8D86'};`,
       channels: gp.ch.map(([k, etiqueta]) => {
@@ -1021,14 +1021,17 @@ async function lzCargarEstado() {
     LZ.st.conAlarma = new Set((al || []).map((a) => a.zona).filter(Boolean));
   } catch (e) { LZ.st.conAlarma = new Set(); }
 
-  /* El próximo encendido de tinaja que hay programado, para decirlo en su grupo
-     en vez de en una tarjeta aparte. */
+  /* El próximo turno de tinaja aprobado. Se lee de la reserva y no de una orden
+     programada: ya no se enciende sola, así que lo que hay que saber es a qué
+     hora la esperan, no a qué hora la iba a encender una máquina. */
   try {
-    const o = (await VA_PANEL.api('ewelink_ordenes?rol=eq.tinaja&accion=eq.on'
-                                + '&estado=eq.pendiente&select=momento&order=momento.asc&limit=1'))?.[0];
-    LZ.st.proxTinaja = o
-      ? `${new Date(o.momento).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })} a las `
-        + new Date(o.momento).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
+    const hoy = new Date().toISOString().slice(0, 10);
+    const t = (await VA_PANEL.api('bloqueos?tinaja=is.true&estado=eq.confirmada'
+                                + `&tinaja_fecha=gte.${hoy}`
+                                + '&select=tinaja_fecha,tinaja_hora&order=tinaja_fecha.asc&limit=1'))?.[0];
+    LZ.st.proxTinaja = t
+      ? `turno ${t.tinaja_fecha === hoy ? 'hoy' : 'el ' + t.tinaja_fecha.slice(8) + '/' + t.tinaja_fecha.slice(5, 7)}`
+        + ` a las ${String(t.tinaja_hora).slice(0, 5)}`
       : null;
   } catch (e) { LZ.st.proxTinaja = null; }
 
