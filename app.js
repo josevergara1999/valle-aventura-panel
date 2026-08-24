@@ -3167,6 +3167,10 @@ const CATEGORIAS = [
   { id: "tinaja",    nombre: "Tinaja",                 detalle: "El dia antes y una hora antes" },
   { id: "operacion", nombre: "El dia a dia",           detalle: "Llegadas, salidas, aseo y pellet" },
   { id: "precios",   nombre: "Control",                detalle: "Cambios de precio y accesos" },
+  /* Se puede apagar como cualquier otra, pero apagarla apaga TAMBIEN el aviso
+     de que una alarma esta sonando. Por eso el detalle lo dice: no es una
+     categoria mas, y quien la apague tiene que saber que renuncia a eso. */
+  { id: "alarmas",   nombre: "Alarmas",                detalle: "Armar, desarmar y — sobre todo — cuando salta una" },
 ];
 
 async function pintarAvisos() {

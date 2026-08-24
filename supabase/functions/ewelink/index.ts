@@ -759,6 +759,38 @@ async function cron() {
     }
   }
 
+  /* Las alarmas. Se miran en cada pasada y se avisa cuando CAMBIAN.
+     Va aquí y no en el botón del panel porque cuando una alarma salta no la
+     pulsa nadie: si el aviso dependiera del botón, el único caso que de verdad
+     importa sería justo el que nunca avisa. De paso cubre lo que se arme desde
+     la app de SmartLife o desde el teclado de la central en la pared. */
+  try {
+    const alarmas = await sb('dispositivos?tipo=eq.alarma&activo=is.true'
+                           + '&select=device_id,nombre,cabana_id,zona,cabanas(nombre)');
+    if (alarmas?.length) {
+      const { lista } = await tuyaAparatos();
+      const porId: Record<string, Record<string, unknown>> = {};
+      for (const d2 of lista) {
+        const dev = d2 as { id: string; status?: Array<{ code: string; value: unknown }> };
+        const m: Record<string, unknown> = {};
+        for (const s of (dev.status ?? [])) m[s.code] = s.value;
+        porId[dev.id] = m;
+      }
+      for (const a of alarmas) {
+        const m = porId[a.device_id];
+        if (!m) continue;   // sin señal: no se sabe, y no saber no es un cambio
+        const donde = a.cabanas?.nombre || a.nombre;
+        const r = await rpc('avisar_alarma', {
+          p_dispositivo: a.device_id,
+          p_donde: donde,
+          p_modo: m['master_mode'] ?? null,
+          p_estado: m['master_state'] ?? null,
+        });
+        if (r) hecho.avisos++;
+      }
+    }
+  } catch (e) { console.error('vigilar alarmas:', (e as Error).message); }
+
   /* Los dos relojes que caducan en silencio. Se miran aquí y no en un cron
      aparte porque un job más es un job más que se puede olvidar de crear. */
   try {
