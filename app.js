@@ -272,18 +272,29 @@ const st = {
 
 /* ----------------------------------------------------------------- Datos -- */
 async function cargarBase() {
-  const [cabanas, reglas, tarifas] = await Promise.all([
+  const [cabanas, reglas, tarifas, hoy] = await Promise.all([
     /* Solo lo ARRENDABLE. La casa del anfitrión existe en `cabanas` porque
        consume pellet como cualquier otra, pero no se vende: si entrara aquí
        aparecería en el calendario, en el cotizador y en el conteo de "cuántas
        quedan libres". El pellet la pide aparte. */
     api("cabanas?select=*&activa=eq.true&arrienda=eq.true&order=orden"),
     api("reglas?select=*&id=eq.1"),
-    api("tarifas?select=*&activa=eq.true&desde=is.null&hasta=is.null&limit=1"),
+    /* `desde_mes=is.null` NO sobra. Una temporada tampoco tiene `desde` ni
+       `hasta` —solo dia y mes—, asi que sin esa condicion la consulta devuelve
+       cinco filas y `limit=1` trae una cualquiera. El dia que trajera una
+       temporada, el campo "Valor base" ensenaria su precio y el boton Guardar
+       se lo sobrescribiria a ella. */
+    api("tarifas?select=*&activa=eq.true&desde=is.null&hasta=is.null" +
+        "&desde_mes=is.null&limit=1"),
+    /* Que temporada rige HOY. Se pregunta a la misma funcion que cobra en vez
+       de deducirlo aqui. */
+    api("rpc/tarifa_de", { method: "POST",
+        body: JSON.stringify({ p_fecha: hoyISO() }) }),
   ]);
   st.cabanas    = cabanas;
   st.reglas     = reglas[0];
   st.tarifaBase = tarifas[0];
+  st.tarifaHoy  = hoy;
   st.cabanaSel  = st.cabanaSel || TODAS;
 }
 
@@ -2620,6 +2631,23 @@ function pintarTemporadas() {
 
   pintarBarraAnio();
   avisarSolape();
+  pintarNotaBase();
+}
+
+/* Decirle a la tarjeta de arriba si su numero se usa o no.
+   Con las temporadas cubriendo el anio entero, el valor base no se cobra
+   NUNCA, y un campo editable con un precio que no se aplica es exactamente
+   lo que hace dudar de cual manda. No se quita —es lo que evita que un hueco
+   de un dia deje una fecha sin poder cotizarse— pero se dice. */
+function pintarNotaBase() {
+  const caja = $("#nota-base");
+  if (!caja) return;
+  const enUso = (st.tramos || []).some((t) => t.nombre === st.tarifaBase?.nombre);
+  caja.textContent = (st.temporadas || []).length === 0
+    ? "Rige todo el año: no hay temporadas cargadas."
+    : enUso
+      ? "Rige en las fechas que ninguna temporada cubre."
+      : "Hoy no se cobra: las temporadas cubren el año entero. Queda de red por si alguna deja un hueco.";
 }
 
 /* Una temporada activa que no aparece en NINGUN tramo del anio esta tapada por
@@ -3852,8 +3880,13 @@ async function iniciar() {
        igual que las demas. */
     elCargarEstado();
 
-    $("#sub-header").textContent =
-      `Base ${clp(st.tarifaBase.precio_base)} - minimo ${st.reglas.minimo_noches} noches`;
+    /* Antes decia siempre "Base $180.000", pasara lo que pasara. En abril eso
+       era mentira: se cobraban $100.000 y la cabecera seguia diciendo 180. Lo
+       que tiene que estar arriba del todo es lo que se cobra HOY. */
+    const h = st.tarifaHoy;
+    $("#sub-header").textContent = h && h.nombre
+      ? `${h.nombre} ${clp(h.precio_base)} - minimo ${st.reglas.minimo_noches} noches`
+      : `Base ${clp(st.tarifaBase.precio_base)} - minimo ${st.reglas.minimo_noches} noches`;
 
     $("#login").hidden = true; $("#app").hidden = false;
   } catch (err) {
