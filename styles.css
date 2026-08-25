@@ -953,6 +953,9 @@ button.mas span { font-size: 18px; font-weight: 700; line-height: 1; margin-top:
 }
 .aviso.error { background: color-mix(in srgb, var(--error) 12%, transparent); color: var(--error); }
 .aviso.info  { background: var(--hoja-2); color: var(--tinta-2); border: 1px solid var(--raya); }
+/* Ni ok ni error: algo que hay que mirar. El solape de temporadas no es
+   un fallo del panel, es un dato que se contradice. */
+.aviso.alerta { background: color-mix(in srgb, var(--alerta) 12%, transparent); color: var(--alerta); }
 
 /* ── Cotización ───────────────────────────────────────────────────────────── */
 .total { font-family: var(--fuente-titulo); font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
@@ -1332,3 +1335,99 @@ body.en-luces main   { padding: 0; max-width: none; }
 }
 .tj-llave span:last-child { color: var(--tinta-3); flex: none; }
 .tj-llave.fuera span:last-child { color: var(--error); font-weight: 600; }
+
+
+/* ------------------------------------------------------------ Temporadas -- */
+/* La nota que ya se escribia con estilos sueltos en cada tarjeta. Misma
+   apariencia, un solo sitio donde cambiarla. */
+.nota-campo {
+  margin: 0 0 var(--e3);
+  color: var(--tinta-3);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* El año de un vistazo. Existe por una razón concreta: un hueco sin cubrir o
+   una temporada tapada por otra no se ven leyendo cuatro números sueltos, y el
+   error se descubre cuando alguien ya reservó a precio de invierno en enero.
+   Los tramos los calcula la MISMA función que cobra, así que esto no es una
+   ilustración de lo que deberia pasar: es lo que va a pasar. */
+#barra-anio {
+  display: flex;
+  width: 100%;
+  height: 34px;
+  margin-bottom: var(--e2);
+  border-radius: var(--radio-chico);
+  overflow: hidden;
+  background: var(--hoja-2);
+}
+.tramo-anio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 2px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  white-space: nowrap;
+  overflow: hidden;
+  border-right: 1px solid var(--hoja);
+}
+.tramo-anio:last-child { border-right: 0; }
+/* Tres pesos del mismo sello, no tres colores. El que mas cuesta es el que
+   mas tinta lleva; asi la barra se lee sin leyenda. */
+.tramo-anio.caro   { background: var(--timbre);        color: var(--tinta-sobre-teal); }
+.tramo-anio.medio  { background: var(--timbre-lavado); color: var(--tinta-sobre-teal); }
+.tramo-anio.barato { background: var(--timbre-palido); color: var(--timbre); }
+.tramo-anio.base   { background: var(--hoja-2);        color: var(--tinta-3); }
+
+/* Los meses debajo, para poder situar los tramos sin contar cuadros. */
+#barra-anio + .meses-anio {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  margin-bottom: var(--e3);
+  font-size: 10px;
+  color: var(--tinta-3);
+  text-align: center;
+}
+
+.fila-temporada {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px var(--e3);
+  width: 100%;
+  min-height: var(--toque);
+  padding: var(--e2) var(--e3);
+  margin-bottom: var(--e2);
+  background: var(--hoja-2);
+  border: 1px solid var(--raya);
+  border-radius: var(--radio-chico);
+  text-align: left;
+  font: inherit;
+  color: var(--tinta);
+  cursor: pointer;
+}
+.fila-temporada .tmp-nombre { font-weight: 600; }
+.fila-temporada .tmp-precio { font-weight: 600; text-align: right; }
+.fila-temporada .tmp-fechas {
+  color: var(--tinta-3);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+/* Una temporada apagada sigue en la lista, pero no finge que cobra. */
+.fila-temporada.inactiva .tmp-nombre,
+.fila-temporada.inactiva .tmp-precio { color: var(--tinta-3); }
+
+/* El dia y el mes, uno al lado del otro. */
+.campo-md { display: grid; grid-template-columns: 1fr 1.6fr; gap: var(--e2); }
+
+.casilla {
+  display: flex;
+  align-items: center;
+  gap: var(--e2);
+  min-height: var(--toque);
+  margin-bottom: var(--e3);
+  cursor: pointer;
+}
+.casilla input { width: 20px; height: 20px; accent-color: var(--timbre); }

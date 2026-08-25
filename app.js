@@ -248,6 +248,7 @@ function avisoPendiente(b) {
 /* ---------------------------------------------------------------- Estado -- */
 const st = {
   cabanas: [], reglas: null, tarifaBase: null,
+  temporadas: [], tramos: [],
   cabanaSel: null,
   vista: "mes",               // "mes" (cuadricula) o "semana" (lista vertical)
   anio: new Date().getFullYear(),
@@ -2496,6 +2497,12 @@ function pintarTarifas() {
   $("#precio-tinaja").value      = st.reglas?.precio_tinaja ?? 25000;
   $("#tinaja-horas").value       = st.reglas?.tinaja_horas ?? 2;
   $("#lbl-incluidas").textContent = st.reglas?.personas_incluidas ?? 5;
+
+  /* Las temporadas se piden al abrir esta vista, no al arrancar el panel: la
+     pantalla de inicio no las usa y son dos peticiones mas en la montana. */
+  cargarTemporadas()
+    .then(pintarTemporadas)
+    .catch((err) => avisarEn("#aviso-tarifas", err.message, "error"));
 }
 
 $("#btn-guardar-precio").addEventListener("click", async () => {
@@ -2525,6 +2532,284 @@ $("#btn-guardar-reglas").addEventListener("click", async () => {
     await cargarBase(); pintarTarifas();
     avisarEn("#aviso-tarifas", "Reglas guardadas.", "ok");
   } catch (err) { avisarEn("#aviso-tarifas", err.message, "error"); }
+});
+
+/* ------------------------------------------------------------ Temporadas -- */
+/* Los precios por epoca del anio. Se guardan como DIA y MES, sin anio, para que
+   se repitan solas: en enero de 2028 el precio sigue siendo el correcto sin que
+   nadie entre a cargarlas de nuevo.
+
+   Quien decide que tarifa aplica a una noche es `tarifa_de()` en Postgres, no
+   este archivo. Aqui solo se pinta y se guarda. Si la regla viviera tambien en
+   el navegador, el dia que se toque una de las dos el panel ensenaria un precio
+   y el cobro haria otro. */
+
+const MESES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun",
+                     "jul", "ago", "sep", "oct", "nov", "dic"];
+const MESES_LARGO = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre",
+                     "Diciembre"];
+/* Febrero lleva 29: la temporada se repite todos los anios y uno de cada cuatro
+   es bisiesto. Guardar el 28 dejaria el 29 fuera de la temporada mas cara. */
+const DIAS_MES = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+const diaMes = (d, m) => `${d} ${MESES_CORTO[m - 1]}`;
+
+async function cargarTemporadas() {
+  const anio = new Date().getFullYear();
+  const [temporadas, tramos] = await Promise.all([
+    api("tarifas?select=*&desde_mes=not.is.null&order=desde_mes.asc,desde_dia.asc"),
+    api("rpc/tramos_temporada", { method: "POST",
+        body: JSON.stringify({ p_anio: anio }) }),
+  ]);
+  st.temporadas = temporadas;
+  st.tramos     = tramos;
+}
+
+/* El anio entero en una barra. El ancho de cada tramo son sus dias reales, no
+   una casilla por temporada: una temporada de dos semanas TIENE que verse como
+   dos semanas, o la barra miente sobre lo que mas se cobra. */
+function pintarBarraAnio() {
+  const caja = $("#barra-anio");
+  const tramos = st.tramos || [];
+  if (!tramos.length) { caja.innerHTML = ""; return; }
+
+  const dias = (a, b) =>
+    Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 864e5) + 1;
+  const total = tramos.reduce((n, t) => n + dias(t.desde, t.hasta), 0);
+
+  /* Tres pesos de tinta segun lo que cuesta, para que se lea sin leyenda. */
+  const precios = [...new Set(tramos.map((t) => t.precio_base))].sort((a, b) => a - b);
+  const peso = (t) => {
+    if (st.tarifaBase && t.nombre === st.tarifaBase.nombre) return "base";
+    if (precios.length < 2) return "medio";
+    if (t.precio_base === precios[precios.length - 1]) return "caro";
+    if (t.precio_base === precios[0]) return "barato";
+    return "medio";
+  };
+
+  caja.innerHTML = tramos.map((t) => {
+    const ancho = (dias(t.desde, t.hasta) / total) * 100;
+    /* Por debajo de ese ancho no cabe ni una palabra recortada, y media letra
+       cortada se lee como un fallo de la pagina. Mejor el hueco limpio. */
+    const rotulo = ancho > 11 ? esc(t.nombre) : "";
+    return `<span class="tramo-anio ${peso(t)}" style="width:${ancho}%"
+                  title="${esc(t.nombre)} &middot; ${clp(t.precio_base)}">${rotulo}</span>`;
+  }).join("");
+
+  if (!caja.nextElementSibling?.classList.contains("meses-anio")) {
+    caja.insertAdjacentHTML("afterend",
+      `<div class="meses-anio">${MESES_CORTO.map((m) =>
+        `<span>${m[0].toUpperCase()}</span>`).join("")}</div>`);
+  }
+}
+
+function pintarTemporadas() {
+  const lista = $("#lista-temporadas");
+  const ts = st.temporadas || [];
+
+  lista.innerHTML = !ts.length
+    ? '<p class="lista-vacia">Sin temporadas. Todo al valor base.</p>'
+    : ts.map((t) => `
+        <button type="button" class="fila-temporada${t.activa ? "" : " inactiva"}"
+                data-temporada="${t.id}">
+          <span class="tmp-nombre">${esc(t.nombre)}</span>
+          <span class="tmp-precio">${clp(t.precio_base)}</span>
+          <span class="tmp-fechas">${diaMes(t.desde_dia, t.desde_mes)} &rarr; ${diaMes(t.hasta_dia, t.hasta_mes)}${t.activa ? "" : " &middot; apagada"}</span>
+        </button>`).join("");
+
+  pintarBarraAnio();
+  avisarSolape();
+}
+
+/* Una temporada activa que no aparece en NINGUN tramo del anio esta tapada por
+   otra: se guardo, se ve en la lista, y no se cobra nunca. Es el fallo que mas
+   caro sale y el unico que no se nota mirando la ficha.
+
+   Se detecta comparando contra los tramos que devuelve la base, no repitiendo
+   aqui la regla de solapes: la verdad la tiene `tarifa_de()`. */
+function avisarSolape() {
+  const caja = $("#aviso-temporadas");
+  const vistos = new Set((st.tramos || []).map((t) => t.nombre));
+  const tapadas = (st.temporadas || [])
+    .filter((t) => t.activa && !vistos.has(t.nombre))
+    .map((t) => t.nombre);
+
+  caja.innerHTML = !tapadas.length ? "" :
+    `<div class="aviso alerta">${tapadas.map(esc).join(", ")}: otra temporada la
+     tapa entera y nunca se cobra. Revisa las fechas.</div>`;
+}
+
+/* El dia se ajusta al mes: sin esto se puede elegir 31 de abril, y el rechazo
+   llega desde la base cuando ya escribiste todo lo demas. */
+function opcionesDia(mes, sel) {
+  let o = "";
+  for (let d = 1; d <= DIAS_MES[mes - 1]; d++)
+    o += `<option value="${d}"${d === sel ? " selected" : ""}>${d}</option>`;
+  return o;
+}
+function opcionesMes(sel) {
+  return MESES_LARGO.map((m, i) =>
+    `<option value="${i + 1}"${i + 1 === sel ? " selected" : ""}>${m}</option>`).join("");
+}
+
+function editarTemporada(id) {
+  const t = (st.temporadas || []).find((x) => x.id === id) || null;
+  const mesHoy = new Date().getMonth() + 1;
+  const v = t || { nombre: "", desde_dia: 1, desde_mes: mesHoy,
+                   hasta_dia: 28, hasta_mes: mesHoy === 12 ? 1 : mesHoy + 1,
+                   precio_base: st.tarifaBase?.precio_base ?? 0, activa: true };
+
+  abrirModal(t ? "Editar temporada" : "Nueva temporada",
+             "Se repite todos los años", `
+    <div class="campo">
+      <label for="tmp-nombre">Nombre</label>
+      <input type="text" id="tmp-nombre" maxlength="40" autocomplete="off"
+             placeholder="Alta invierno" value="${esc(v.nombre)}">
+    </div>
+
+    <div class="fila">
+      <div class="campo">
+        <label for="tmp-desde-dia">Empieza</label>
+        <div class="campo-md">
+          <select id="tmp-desde-dia">${opcionesDia(v.desde_mes, v.desde_dia)}</select>
+          <select id="tmp-desde-mes">${opcionesMes(v.desde_mes)}</select>
+        </div>
+      </div>
+      <div class="campo">
+        <label for="tmp-hasta-dia">Termina</label>
+        <div class="campo-md">
+          <select id="tmp-hasta-dia">${opcionesDia(v.hasta_mes, v.hasta_dia)}</select>
+          <select id="tmp-hasta-mes">${opcionesMes(v.hasta_mes)}</select>
+        </div>
+      </div>
+    </div>
+    <p class="nota-campo" id="tmp-cruce"></p>
+
+    <div class="campo">
+      <label for="tmp-precio">Valor por noche</label>
+      <input type="number" id="tmp-precio" inputmode="numeric" step="1000"
+             value="${v.precio_base}">
+    </div>
+    <p class="nota-campo">
+      El recargo por persona y el mínimo de noches no cambian:
+      son los mismos de Reglas.
+    </p>
+
+    <label class="casilla">
+      <input type="checkbox" id="tmp-activa"${v.activa ? " checked" : ""}>
+      <span>Cobrar esta temporada</span>
+    </label>
+
+    <div id="aviso-tmp-editor"></div>
+    <button class="ancho" type="button" id="tmp-guardar">Guardar</button>
+    <button class="secundario ancho" type="button" data-cerrar>Cancelar</button>
+    ${t ? '<button class="secundario ancho" type="button" id="tmp-borrar">Eliminar temporada</button>' : ""}
+  `);
+
+  /* Cambiar el mes reescribe los dias, conservando el elegido si sigue
+     existiendo. Del 31 de enero al 30 de abril: se queda en 30, no en vacio. */
+  const sincroDias = (idDia, idMes) => {
+    const selDia = $(idDia), selMes = $(idMes);
+    selMes.addEventListener("change", () => {
+      const mes = Number(selMes.value);
+      const quiere = Math.min(Number(selDia.value), DIAS_MES[mes - 1]);
+      selDia.innerHTML = opcionesDia(mes, quiere);
+      pintarCruce();
+    });
+    selDia.addEventListener("change", pintarCruce);
+  };
+
+  /* Que una temporada cruce el anio nuevo no es un error: es diciembre a
+     febrero, la mas cara del anio. Se dice en voz alta porque un rango que
+     empieza despues de donde termina parece un dedazo. */
+  function pintarCruce() {
+    const d = Number($("#tmp-desde-mes").value) * 100 + Number($("#tmp-desde-dia").value);
+    const h = Number($("#tmp-hasta-mes").value) * 100 + Number($("#tmp-hasta-dia").value);
+    /* Terminar en febrero incluye el 29 de los anios bisiestos. Se dice
+       porque el selector marca 28 y esa noche vale como toda la temporada:
+       callarlo es venderla barata cada cuatro anios. */
+    var finFebrero = Number($("#tmp-hasta-mes").value) === 2 &&
+                     Number($("#tmp-hasta-dia").value) >= 28;
+    $("#tmp-cruce").textContent =
+        d > h && finFebrero ? "Cruza el año nuevo. El 29 de febrero entra en los años bisiestos."
+      : d > h               ? "Cruza el año nuevo. Empieza en diciembre y sigue en enero."
+      : finFebrero          ? "El 29 de febrero entra en los años bisiestos."
+      : "";
+  }
+
+  sincroDias("#tmp-desde-dia", "#tmp-desde-mes");
+  sincroDias("#tmp-hasta-dia", "#tmp-hasta-mes");
+  pintarCruce();
+
+  $("#tmp-guardar").addEventListener("click", () => guardarTemporada(t));
+  if (t) $("#tmp-borrar").addEventListener("click", () => borrarTemporada(t));
+}
+
+async function guardarTemporada(t) {
+  const nombre = $("#tmp-nombre").value.trim();
+  const precio = Number($("#tmp-precio").value);
+  const cuerpo = {
+    nombre,
+    desde_dia: Number($("#tmp-desde-dia").value),
+    desde_mes: Number($("#tmp-desde-mes").value),
+    hasta_dia: Number($("#tmp-hasta-dia").value),
+    hasta_mes: Number($("#tmp-hasta-mes").value),
+    precio_base: precio,
+    activa: $("#tmp-activa").checked,
+  };
+
+  if (!nombre) return avisarEn("#aviso-tmp-editor", "Falta el nombre.", "error");
+  if (!(precio > 0)) return avisarEn("#aviso-tmp-editor", "Falta el valor por noche.", "error");
+  /* El nombre es lo que agrupa las noches en la cotizacion y lo que compara el
+     aviso de solape. Dos temporadas con el mismo nombre saldrian sumadas como
+     si fueran una sola. */
+  if ((st.temporadas || []).some((x) => x.id !== (t && t.id) &&
+        x.nombre.toLowerCase() === nombre.toLowerCase()))
+    return avisarEn("#aviso-tmp-editor", "Ya hay una temporada con ese nombre.", "error");
+
+  const btn = $("#tmp-guardar");
+  btn.disabled = true; btn.textContent = "Guardando...";
+  try {
+    if (t) await api(`tarifas?id=eq.${t.id}`, { method: "PATCH", body: JSON.stringify(cuerpo) });
+    else   await api("tarifas", { method: "POST", body: JSON.stringify(cuerpo) });
+    await cargarTemporadas();
+    cerrarModal();
+    pintarTemporadas();
+    avisarEn("#aviso-tarifas", "Temporada guardada. El bot ya cotiza con ella.", "ok");
+  } catch (err) {
+    avisarEn("#aviso-tmp-editor", err.message, "error");
+    btn.disabled = false; btn.textContent = "Guardar";
+  }
+}
+
+/* Eliminar vive DENTRO de la ficha y pide confirmacion, no en la fila de la
+   lista. Un boton de borrar en cada fila no se aprieta sin querer: se aprieta
+   en la temporada equivocada. */
+async function borrarTemporada(t) {
+  const btn = $("#tmp-borrar");
+  if (btn.dataset.seguro !== "1") {
+    btn.dataset.seguro = "1";
+    btn.textContent = "Confirmar: eliminar";
+    return;
+  }
+  btn.disabled = true;
+  try {
+    await api(`tarifas?id=eq.${t.id}`, { method: "DELETE" });
+    await cargarTemporadas();
+    cerrarModal();
+    pintarTemporadas();
+    avisarEn("#aviso-tarifas", "Temporada eliminada.", "ok");
+  } catch (err) {
+    avisarEn("#aviso-tmp-editor", err.message, "error");
+    btn.disabled = false; btn.textContent = "Eliminar temporada";
+  }
+}
+
+$("#btn-nueva-temporada").addEventListener("click", () => editarTemporada(null));
+$("#lista-temporadas").addEventListener("click", (e) => {
+  const f = e.target.closest("[data-temporada]");
+  if (f) editarTemporada(f.dataset.temporada);
 });
 
 /* ------------------------------------------------------------- Cotizador -- */
