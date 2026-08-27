@@ -249,6 +249,7 @@ function avisoPendiente(b) {
 const st = {
   cabanas: [], reglas: null, tarifaBase: null,
   temporadas: [], tramos: [],
+  cotizaciones: [],
   cabanaSel: null,
   vista: "mes",               // "mes" (cuadricula) o "semana" (lista vertical)
   anio: new Date().getFullYear(),
@@ -2514,6 +2515,10 @@ function pintarTarifas() {
   cargarTemporadas()
     .then(pintarTemporadas)
     .catch((err) => avisarEn("#aviso-tarifas", err.message, "error"));
+
+  cargarCotizaciones()
+    .then(pintarCotizaciones)
+    .catch((err) => avisarEn("#aviso-cotizaciones", err.message, "error"));
 }
 
 $("#btn-guardar-precio").addEventListener("click", async () => {
@@ -2838,6 +2843,335 @@ $("#btn-nueva-temporada").addEventListener("click", () => editarTemporada(null))
 $("#lista-temporadas").addEventListener("click", (e) => {
   const f = e.target.closest("[data-temporada]");
   if (f) editarTemporada(f.dataset.temporada);
+});
+
+/* ---------------------------------------------------------- Cotizaciones -- */
+/* El precio que Jose cierra por WhatsApp y no es el de la web. Genera un codigo
+   corto, se lo manda con el enlace, y el cliente paga online al precio pactado.
+
+   El precio vive en la base y se canjea alli. Aqui no se calcula nada: si el
+   descuento lo decidiera esta pantalla, bastaria con abrir la consola del
+   navegador para pagarse la cabaña a mil pesos. */
+
+const DIAS_VENCE = 7;
+
+async function cargarCotizaciones() {
+  /* Las usadas y las anuladas no se listan: la pantalla es para las que estan
+     esperando que alguien pague. El historial vive en la reserva que salio de
+     cada una. */
+  st.cotizaciones = await api(
+    "cotizaciones?select=*&usada_at=is.null&anulada_at=is.null&order=creada_at.desc");
+}
+
+function pintarCotizaciones() {
+  const lista = $("#lista-cotizaciones");
+  const cs = st.cotizaciones || [];
+  if (!cs.length) {
+    lista.innerHTML = '<p class="lista-vacia">Ninguna esperando pago.</p>';
+    return;
+  }
+
+  const hoy = hoyISO();
+  lista.innerHTML = cs.map((c) => {
+    const vencida = c.vence_at.slice(0, 10) < hoy;
+    const pasada  = c.hasta <= hoy;
+    /* Una cotizacion vencida sigue en la lista en vez de desaparecer: si el
+       cliente escribe preguntando por que no le funciona, tiene que estar a la
+       vista para poder decirle que caduco y hacerle otra. */
+    const estado = pasada  ? "fechas pasadas"
+                 : vencida ? "vencida"
+                 : "";
+    return `
+      <button type="button" class="fila-cotizacion${estado ? " inactiva" : ""}"
+              data-cotizacion="${c.id}">
+        <span class="ct-nombre">${esc(c.nombre)}</span>
+        <span class="ct-precio">${clp(c.precio_noche)}</span>
+        <span class="ct-datos">${esc(nombreCabana(c.cabana_id))} &middot; ${fechaCorta(c.desde)} a ${fechaCorta(c.hasta)}${
+          c.noche_extra_pct ? ` &middot; +noche ${c.noche_extra_pct}%` : ""}${
+          estado ? ` &middot; ${estado}` : ""}</span>
+        <span class="ct-codigo">${esc(c.codigo)}</span>
+      </button>`;
+  }).join("");
+}
+
+/* ---- Crear una ---- */
+function nuevaCotizacion() {
+  const manana = sumarDias(hoyISO(), 1);
+  abrirModal("Nueva cotización", "Precio pactado por fuera", `
+    <div class="campo">
+      <label for="ct-nombre">Nombre y apellido</label>
+      <input type="text" id="ct-nombre" autocomplete="off" maxlength="80"
+             placeholder="Camila Pérez">
+    </div>
+    <p class="nota-campo">
+      Tiene que escribirlo igual para abrir su cotización.
+      No importan mayúsculas ni tildes.
+    </p>
+
+    <div class="campo">
+      <label for="ct-telefono">Teléfono</label>
+      <input type="tel" id="ct-telefono" inputmode="tel" placeholder="+56 9 ...">
+    </div>
+
+    <div class="campo">
+      <label for="ct-cabana">Cabaña</label>
+      <select id="ct-cabana">
+        ${st.cabanas.map((c) =>
+          `<option value="${c.id}">${esc(c.nombre)} - hasta ${c.capacidad_max}</option>`).join("")}
+      </select>
+    </div>
+
+    <div class="fila">
+      <div class="campo">
+        <label for="ct-desde">Entrada</label>
+        <input type="date" id="ct-desde" value="${manana}" min="${hoyISO()}">
+      </div>
+      <div class="campo">
+        <label for="ct-hasta">Salida</label>
+        <input type="date" id="ct-hasta" value="${sumarDias(manana, 2)}" min="${manana}">
+      </div>
+    </div>
+
+    <div class="fila">
+      <div class="campo">
+        <label for="ct-adultos">Adultos</label>
+        <input type="number" id="ct-adultos" inputmode="numeric" min="1" value="2">
+      </div>
+      <div class="campo">
+        <label for="ct-ninos">Niños (hasta ${st.reglas?.edad_nino_max ?? 11})</label>
+        <input type="number" id="ct-ninos" inputmode="numeric" min="0" value="0">
+      </div>
+    </div>
+
+    <div class="campo">
+      <label for="ct-precio">Precio pactado por noche</label>
+      <input type="number" id="ct-precio" inputmode="numeric" step="1000">
+    </div>
+    <p class="nota-campo" id="ct-comparacion"></p>
+
+    <label class="casilla">
+      <input type="checkbox" id="ct-extra-on">
+      <span>Ofrecerle una noche extra</span>
+    </label>
+    <div class="campo" id="ct-extra-campo" hidden>
+      <label for="ct-extra-pct">Descuento de esa noche (%)</label>
+      <input type="number" id="ct-extra-pct" inputmode="numeric" min="1" max="100" value="50">
+    </div>
+    <p class="nota-campo" id="ct-extra-nota"></p>
+
+    <div class="fila">
+      <div class="campo">
+        <label for="ct-vence">Vence en (días)</label>
+        <input type="number" id="ct-vence" inputmode="numeric" min="1" value="${DIAS_VENCE}">
+      </div>
+      <div class="campo">
+        <label for="ct-nota">Nota (solo para ti)</label>
+        <input type="text" id="ct-nota" maxlength="80" placeholder="Cliente repetido">
+      </div>
+    </div>
+
+    <div id="aviso-ct-editor"></div>
+    <button class="ancho" type="button" id="ct-guardar">Generar código</button>
+    <button class="secundario ancho" type="button" data-cerrar>Cancelar</button>
+  `);
+
+  /* Comparar con lo que cobraria la web esas mismas noches. Es el dato que
+     falta para decidir: "le estoy dejando $30.000 menos" se ve solo, y sin
+     esto habria que abrirlo en otra pantalla. */
+  async function comparar() {
+    const caja = $("#ct-comparacion");
+    const desde = $("#ct-desde").value, hasta = $("#ct-hasta").value;
+    const adultos = Number($("#ct-adultos").value) || 1;
+    const pactado = Number($("#ct-precio").value);
+    if (!desde || !hasta || hasta <= desde) { caja.textContent = ""; return; }
+    try {
+      const c = await api("rpc/cotizar", { method: "POST", body: JSON.stringify({
+        p_cabana: $("#ct-cabana").value, p_entrada: desde, p_salida: hasta,
+        p_adultos: adultos, p_ninos: Number($("#ct-ninos").value) || 0 }) });
+      if (!c?.ok) { caja.textContent = ""; return; }
+      const porNoche = Math.round(c.total / c.noches);
+      if (!pactado) {
+        caja.textContent = `La web cobraría ${clp(porNoche)} por noche.`;
+        return;
+      }
+      const dif = porNoche - pactado;
+      caja.textContent = dif > 0
+        ? `La web cobraría ${clp(porNoche)}. Le dejas ${clp(dif)} menos por noche.`
+        : dif < 0
+          ? `Ojo: es ${clp(-dif)} MÁS caro que la web (${clp(porNoche)}).`
+          : `Es el mismo precio que la web.`;
+    } catch { caja.textContent = ""; }
+  }
+
+  /* Si la noche de al lado esta ocupada no se puede ofrecer, y decirlo aqui
+     evita prometerlo por WhatsApp y que la pantalla luego no lo enseñe. */
+  async function mirarNocheExtra() {
+    const caja = $("#ct-extra-nota");
+    if (!$("#ct-extra-on").checked) { caja.textContent = ""; return; }
+    const desde = $("#ct-desde").value, hasta = $("#ct-hasta").value;
+    if (!desde || !hasta || hasta <= desde) { caja.textContent = ""; return; }
+    try {
+      const e = await api("rpc/noche_extra_libre", { method: "POST", body: JSON.stringify({
+        p_cabana: $("#ct-cabana").value, p_desde: desde, p_hasta: hasta }) });
+      const pct = Number($("#ct-extra-pct").value) || 0;
+      const precio = Math.round(Number($("#ct-precio").value || 0) * (100 - pct) / 100);
+      caja.textContent = !e
+        ? "No hay noche libre al lado: no se le va a ofrecer nada."
+        : e.tipo === "despues"
+          ? `Se le ofrecerá quedarse hasta el ${fechaCorta(e.hasta)}${precio ? ` por ${clp(precio)}` : ""}.`
+          : `La de después está ocupada. Se le ofrecerá llegar el ${fechaCorta(e.desde)}${precio ? ` por ${clp(precio)}` : ""}.`;
+    } catch { caja.textContent = ""; }
+  }
+
+  $("#ct-extra-on").addEventListener("change", (e) => {
+    $("#ct-extra-campo").hidden = !e.target.checked;
+    mirarNocheExtra();
+  });
+  ["#ct-desde", "#ct-hasta", "#ct-cabana", "#ct-adultos", "#ct-ninos", "#ct-precio"]
+    .forEach((s) => $(s).addEventListener("change", () => { comparar(); mirarNocheExtra(); }));
+  $("#ct-extra-pct").addEventListener("change", mirarNocheExtra);
+  comparar();
+
+  $("#ct-guardar").addEventListener("click", guardarCotizacion);
+}
+
+async function guardarCotizacion() {
+  const nombre = $("#ct-nombre").value.trim();
+  const desde = $("#ct-desde").value, hasta = $("#ct-hasta").value;
+  const precio = Number($("#ct-precio").value);
+  const extraOn = $("#ct-extra-on").checked;
+  const dias = Number($("#ct-vence").value) || DIAS_VENCE;
+
+  const mal = !nombre ? "Falta el nombre y apellido."
+            : nombre.trim().split(/\s+/).length < 2 ? "Pon nombre Y apellido: es lo que tendrá que escribir."
+            : !desde || !hasta || hasta <= desde ? "Las fechas no cuadran."
+            : !(precio > 0) ? "Falta el precio por noche."
+            : null;
+  if (mal) return avisarEn("#aviso-ct-editor", mal, "error");
+
+  const vence = new Date();
+  vence.setDate(vence.getDate() + dias);
+
+  const btn = $("#ct-guardar");
+  btn.disabled = true; btn.textContent = "Generando...";
+  try {
+    const [c] = await api("cotizaciones", {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({
+        nombre, telefono: $("#ct-telefono").value.trim() || null,
+        cabana_id: $("#ct-cabana").value,
+        desde, hasta,
+        adultos: Number($("#ct-adultos").value) || 1,
+        ninos: Number($("#ct-ninos").value) || 0,
+        precio_noche: precio,
+        noche_extra_pct: extraOn ? (Number($("#ct-extra-pct").value) || 50) : null,
+        nota: $("#ct-nota").value.trim() || null,
+        vence_at: vence.toISOString(),
+      }),
+    });
+    await cargarCotizaciones();
+    pintarCotizaciones();
+    mostrarCodigo(c);
+  } catch (err) {
+    avisarEn("#aviso-ct-editor", err.message, "error");
+    btn.disabled = false; btn.textContent = "Generar código";
+  }
+}
+
+/* El codigo recien hecho, con el mensaje ya escrito. Lo que hace falta despues
+   de generarlo no es verlo: es mandarlo. */
+function mostrarCodigo(c) {
+  const noches = (new Date(c.hasta) - new Date(c.desde)) / 864e5;
+  const total = c.precio_noche * noches;
+  abrirModal("Listo", `Para ${c.nombre}`, `
+    <div class="tarjeta" style="text-align:center;padding:var(--e5) var(--e4)">
+      <p class="nota-campo" style="margin:0 0 var(--e2)">El código</p>
+      <p style="font:700 30px/1 var(--fuente-mono);letter-spacing:.06em;margin:0">
+        ${esc(c.codigo)}</p>
+    </div>
+    <div class="linea-detalle"><span>${esc(nombreCabana(c.cabana_id))}</span>
+      <b>${fechaCorta(c.desde)} a ${fechaCorta(c.hasta)}</b></div>
+    <div class="linea-detalle"><span>${noches} noches a ${clp(c.precio_noche)}</span>
+      <b>${clp(total)}</b></div>
+    ${c.noche_extra_pct
+      ? `<div class="linea-detalle"><span>Noche extra</span><b>${c.noche_extra_pct}% de descuento</b></div>`
+      : ""}
+    <p class="nota-campo">
+      Un solo uso. Caduca ${fechaCorta(c.vence_at.slice(0, 10))}.
+    </p>
+    <button class="ancho" type="button" id="ct-whatsapp">Enviar por WhatsApp</button>
+    <button class="secundario ancho" type="button" id="ct-copiar">Copiar el mensaje</button>
+    <button class="secundario ancho" type="button" data-cerrar>Cerrar</button>
+  `);
+
+  const texto = mensajeCotizacion(c, noches, total);
+  $("#ct-whatsapp").addEventListener("click", () => {
+    const fono = (c.telefono || "").replace(/[^0-9]/g, "");
+    window.open(fono ? `https://wa.me/${fono}?text=${encodeURIComponent(texto)}`
+                     : `https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank");
+  });
+  $("#ct-copiar").addEventListener("click", async (e) => {
+    try {
+      await navigator.clipboard.writeText(texto);
+      e.target.textContent = "Copiado";
+    } catch { e.target.textContent = "No se pudo copiar"; }
+  });
+}
+
+/* El mensaje NO lleva el precio pactado. Se lo dices tu por WhatsApp como
+   siempre; aqui va lo justo para que entre y lo vea en la pantalla de pago.
+   Si el precio viajara escrito, cualquiera que reenvie el mensaje sabe lo que
+   le dejaste a otro. */
+function mensajeCotizacion(c, noches, total) {
+  return [
+    `Hola ${c.nombre.split(/\s+/)[0]}, te dejo todo listo para tomar la reserva.`,
+    ``,
+    `${nombreCabana(c.cabana_id)}`,
+    `${fechaCorta(c.desde)} al ${fechaCorta(c.hasta)} - ${noches} noches`,
+    ``,
+    `Entra aquí: https://valleaventura-chile.com/#cotizacion`,
+    `Pon tu nombre completo y este código:`,
+    ``,
+    `${c.codigo}`,
+    ``,
+    `Te va a aparecer el precio que conversamos. Se paga el 50% ahora y el resto en la cabaña.`,
+  ].join("\n");
+}
+
+/* ---- Anular ---- */
+function verCotizacion(id) {
+  const c = (st.cotizaciones || []).find((x) => x.id === id);
+  if (!c) return;
+  const noches = (new Date(c.hasta) - new Date(c.desde)) / 864e5;
+  mostrarCodigo(c);
+  /* El anular se añade a la ficha que ya existe en vez de una pantalla nueva:
+     es el mismo sitio donde estabas mirando el codigo. */
+  $("#ct-copiar").insertAdjacentHTML("afterend",
+    `<button class="secundario ancho" type="button" id="ct-anular">Anular cotización</button>`);
+  $("#ct-anular").addEventListener("click", async (e) => {
+    const b = e.target;
+    if (b.dataset.seguro !== "1") {
+      b.dataset.seguro = "1"; b.textContent = "Confirmar: anular";
+      return;
+    }
+    b.disabled = true;
+    try {
+      await api(`cotizaciones?id=eq.${c.id}`, { method: "PATCH",
+        body: JSON.stringify({ anulada_at: new Date().toISOString() }) });
+      await cargarCotizaciones(); pintarCotizaciones(); cerrarModal();
+      avisarEn("#aviso-tarifas", "Cotización anulada. El código ya no sirve.", "ok");
+    } catch (err) {
+      avisarEn("#aviso-ct-editor", err.message, "error");
+      b.disabled = false; b.textContent = "Anular cotización";
+    }
+  });
+}
+
+$("#btn-nueva-cotizacion").addEventListener("click", nuevaCotizacion);
+$("#lista-cotizaciones").addEventListener("click", (e) => {
+  const f = e.target.closest("[data-cotizacion]");
+  if (f) verCotizacion(f.dataset.cotizacion);
 });
 
 /* ------------------------------------------------------------- Cotizador -- */

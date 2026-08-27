@@ -1431,3 +1431,36 @@ body.en-luces main   { padding: 0; max-width: none; }
   cursor: pointer;
 }
 .casilla input { width: 20px; height: 20px; accent-color: var(--timbre); }
+
+/* --------------------------------------------------------- Cotizaciones -- */
+.fila-cotizacion {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px var(--e3);
+  width: 100%;
+  min-height: var(--toque);
+  padding: var(--e2) var(--e3);
+  margin-bottom: var(--e2);
+  background: var(--hoja-2);
+  border: 1px solid var(--raya);
+  border-radius: var(--radio-chico);
+  text-align: left;
+  font: inherit;
+  color: var(--tinta);
+  cursor: pointer;
+}
+.fila-cotizacion .ct-nombre { font-weight: 600; }
+.fila-cotizacion .ct-precio { font-weight: 600; text-align: right; }
+.fila-cotizacion .ct-datos  { color: var(--tinta-3); font-size: 12px; }
+/* El codigo en monoespaciada: se dicta por telefono y se copia a mano, y en
+   proporcional la G y la 6 se parecen lo justo para equivocarse. */
+.fila-cotizacion .ct-codigo {
+  font: 600 12px/1.4 var(--fuente-mono);
+  letter-spacing: .04em;
+  color: var(--timbre);
+  text-align: right;
+}
+/* Vencida o con las fechas pasadas: sigue en la lista, pero apagada. */
+.fila-cotizacion.inactiva .ct-nombre,
+.fila-cotizacion.inactiva .ct-precio,
+.fila-cotizacion.inactiva .ct-codigo { color: var(--tinta-3); }
