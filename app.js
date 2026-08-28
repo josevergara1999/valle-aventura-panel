@@ -3092,11 +3092,14 @@ function mostrarCodigo(c) {
   const noches = (new Date(c.hasta) - new Date(c.desde)) / 864e5;
   const total = c.precio_noche * noches;
   abrirModal("Listo", `Para ${c.nombre}`, `
-    <div class="tarjeta" style="text-align:center;padding:var(--e5) var(--e4)">
-      <p class="nota-campo" style="margin:0 0 var(--e2)">El código</p>
-      <p style="font:700 30px/1 var(--fuente-mono);letter-spacing:.06em;margin:0">
-        ${esc(c.codigo)}</p>
-    </div>
+    <button type="button" id="ct-copiar-codigo" class="tarjeta"
+            style="display:block;width:100%;text-align:center;padding:var(--e5) var(--e4);
+                   cursor:pointer;font:inherit;color:inherit">
+      <span class="nota-campo" style="display:block;margin:0 0 var(--e2)"
+            id="ct-copiar-pie">El código &middot; toca para copiar</span>
+      <span style="display:block;font:700 30px/1 var(--fuente-mono);letter-spacing:.06em">
+        ${esc(c.codigo)}</span>
+    </button>
     <div class="linea-detalle"><span>${esc(nombreCabana(c.cabana_id))}</span>
       <b>${fechaCorta(c.desde)} a ${fechaCorta(c.hasta)}</b></div>
     <div class="linea-detalle"><span>${noches} noches a ${clp(c.precio_noche)}</span>
@@ -3118,6 +3121,27 @@ function mostrarCodigo(c) {
     window.open(fono ? `https://wa.me/${fono}?text=${encodeURIComponent(texto)}`
                      : `https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank");
   });
+  /* Tocar el codigo lo copia. Es el gesto que la gente ya intenta —tocar el
+     numero grande— y hasta ahora no hacia nada; el boton de abajo copia el
+     mensaje entero, que es otra cosa. */
+  $("#ct-copiar-codigo").addEventListener("click", async () => {
+    const pie = $("#ct-copiar-pie");
+    try {
+      await navigator.clipboard.writeText(c.codigo);
+      pie.textContent = "Copiado";
+    } catch (_) {
+      /* Sin permiso de portapapeles se selecciona, que es lo mas cerca de
+         copiarlo que se puede llegar sin el. */
+      try {
+        const r = document.createRange();
+        r.selectNodeContents($("#ct-copiar-codigo").lastElementChild);
+        const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+        pie.textContent = "Mantén pulsado y copia";
+      } catch (__) { pie.textContent = "No se pudo copiar"; }
+    }
+    setTimeout(() => { pie.innerHTML = "El código &middot; toca para copiar"; }, 2500);
+  });
+
   $("#ct-copiar").addEventListener("click", async (e) => {
     try {
       await navigator.clipboard.writeText(texto);
