@@ -154,6 +154,10 @@
 
   /* La burbuja aterriza y RECIEN ENTONCES cambia la pantalla. */
   function ir(i, desdeGesto) {
+    /* Lo primero: si el riel estaba abierto, se va. Sin esto la pantalla
+       cambiaba por detras y el velo se quedaba encima tapandolo todo: parecia
+       que la app se habia colgado, y no habia por donde salir. */
+    if (riel) cerrarRiel(true);
     if (i === activo && !desdeGesto) return abrirSiEsMas(i);
     activo = i;
     marcar(i);
@@ -284,8 +288,11 @@
     riel.addEventListener('pointercancel', () => { dr = false; });
     tag.addEventListener('click', () => {
       const e = entradas()[rielIdx];
-      cerrarRiel();
+      cerrarRiel(true);
       if (e && window.VA_IR) window.VA_IR(e.v);
+      /* La burbuja se queda sobre la sexta, que es de donde salio esta
+         pantalla: asi la barra sigue diciendo donde estas. */
+      colocar(activo, true);
     });
     document.addEventListener('keydown', escRiel);
   }
@@ -305,14 +312,15 @@
 
   function escRiel(e) { if (e.key === 'Escape') cerrarRiel(); }
 
-  function cerrarRiel() {
+  function cerrarRiel(vamosANavegar) {
     document.removeEventListener('keydown', escRiel);
     [riel, velo, tag].forEach((n) => { if (n && n.parentNode) n.parentNode.removeChild(n); });
     riel = velo = tag = null;
     burbuja.classList.remove('lanzar');
-    /* Si sales del riel sin elegir, la burbuja se queda sobre la sexta: es de
-       donde saliste. */
-    colocar(activo, true);
+    /* Si sales del riel sin elegir, la burbuja vuelve a la sexta: es de donde
+       saliste. Si vas a navegar, no — la pondria ahi para saltar acto seguido
+       a otra, y se veria el rebote. */
+    if (!vamosANavegar) colocar(activo, true);
   }
 
   /* Arranque: la primera, ya pintada. */
