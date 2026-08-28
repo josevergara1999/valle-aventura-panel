@@ -2516,9 +2516,6 @@ function pintarTarifas() {
     .then(pintarTemporadas)
     .catch((err) => avisarEn("#aviso-tarifas", err.message, "error"));
 
-  cargarCotizaciones()
-    .then(pintarCotizaciones)
-    .catch((err) => avisarEn("#aviso-cotizaciones", err.message, "error"));
 }
 
 $("#btn-guardar-precio").addEventListener("click", async () => {
@@ -2954,10 +2951,20 @@ function nuevaCotizacion() {
       <span>Ofrecerle una noche extra</span>
     </label>
     <div class="campo" id="ct-extra-campo" hidden>
-      <label for="ct-extra-pct">Descuento de esa noche (%)</label>
-      <input type="number" id="ct-extra-pct" inputmode="numeric" min="1" max="100" value="50">
+      <label for="ct-extra-pct">Descuento de esa noche</label>
+      <select id="ct-extra-pct">
+        <option value="25">25% de descuento</option>
+        <option value="45">45% de descuento</option>
+        <option value="50" selected>50% de descuento</option>
+        <option value="75">75% de descuento</option>
+        <option value="100">Noche extra gratis</option>
+      </select>
     </div>
     <p class="nota-campo" id="ct-extra-nota"></p>
+    <p class="nota-campo">
+      Solo estos cinco: son los que tiene la ruleta de la web.
+      Un valor suelto no tendría dónde caer y no giraría.
+    </p>
 
     <div class="fila">
       <div class="campo">
@@ -3130,8 +3137,13 @@ function mensajeCotizacion(c, noches, total) {
     `${nombreCabana(c.cabana_id)}`,
     `${fechaCorta(c.desde)} al ${fechaCorta(c.hasta)} - ${noches} noches`,
     ``,
-    `Entra aquí: https://valleaventura-chile.com/#cotizacion`,
-    `Pon tu nombre completo y este código:`,
+    /* El codigo va DENTRO del enlace: al tocarlo se abre el formulario con el
+       codigo ya escrito y solo tiene que poner su nombre. Va ademas suelto
+       debajo porque WhatsApp a veces parte los enlaces largos, y entonces hay
+       que poder copiarlo a mano. */
+    `Entra aquí: https://valleaventura-chile.com/?c=${c.codigo}`,
+    ``,
+    `Pon tu nombre completo. Si te lo pide, el código es:`,
     ``,
     `${c.codigo}`,
     ``,
@@ -4155,7 +4167,7 @@ document.querySelectorAll("nav.tabs button").forEach((b) => {
   b.addEventListener("click", () => {
     document.querySelectorAll("nav.tabs button")
       .forEach((x) => x.setAttribute("aria-selected", String(x === b)));
-    ["calendario", "huespedes", "luces", "aseos", "finanzas", "tarifas", "avisos"].forEach((v) => {
+    ["calendario", "huespedes", "luces", "aseos", "finanzas", "cotizaciones", "tarifas", "avisos"].forEach((v) => {
       $(`#vista-${v}`).hidden = v !== b.dataset.vista;
     });
     /* En Luces se esconde la cabecera. Es la unica pantalla donde lo de
@@ -4170,6 +4182,10 @@ document.querySelectorAll("nav.tabs button").forEach((b) => {
     if (b.dataset.vista === "tarifas")  pintarTarifas();
     if (b.dataset.vista === "aseos")    pintarAseos();
     if (b.dataset.vista === "finanzas") pintarFinanzas();
+    if (b.dataset.vista === "cotizaciones") {
+      cargarCotizaciones().then(pintarCotizaciones)
+        .catch((err) => avisarEn("#aviso-cotizaciones", err.message, "error"));
+    }
     window.scrollTo(0, 0);
   });
 });
