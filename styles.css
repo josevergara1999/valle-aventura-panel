@@ -970,29 +970,9 @@ button.mas span { font-size: 18px; font-weight: 700; line-height: 1; margin-top:
 
 /* ── Pestañas ─────────────────────────────────────────────────────────────── */
 /* Abajo, al alcance del pulgar. Es un panel que se usa de pie y con una mano. */
-nav.tabs {
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
-  display: flex; border-top: 1px solid var(--raya);
-  padding-bottom: env(safe-area-inset-bottom);
-  /* OPACA, y sin `backdrop-filter`, a propósito — es el mismo criterio que ya
-     rige en `.tarjeta`. El filtro obliga a WebKit a promover la barra a su
-     propia capa de composición, y una capa fija promovida NO se vuelve a
-     anclar al viewport durante un desplazamiento suave pedido desde JS: se
-     quedaba clavada a media pantalla hasta el siguiente scroll a dedo.
-     Opaca cumple mejor lo que el filtro venía a resolver —que el contenido de
-     detrás no se lea a través— y no cuesta una capa. */
-  background: var(--hoja);
-}
-nav.tabs button {
-  flex: 1; background: transparent; color: var(--tinta-3);
-  /* 10.5px y no 11.5: con siete destinos "Huespedes" ya no cabe en su séptimo
-     de pantalla y se parte en dos líneas, que descuadra la barra entera. El
-     `nowrap` es el seguro — antes de partirse, que se apriete. */
-  font-size: 10.5px; font-weight: 600; min-height: var(--toque);
-  border-radius: 0; padding: 0 2px; letter-spacing: 0;
-  white-space: nowrap;
-}
-nav.tabs button[aria-selected="true"] { color: var(--timbre); box-shadow: inset 0 2px 0 var(--timbre); }
+/* La barra vive ahora al final de este archivo: burbuja, muesca y riel.
+   Las reglas viejas se quitaron en vez de pisarse — el borde superior y la
+   linea del activo peleaban con la muesca, que necesita el canto limpio. */
 
 /* ── Movimiento reducido ──────────────────────────────────────────────────── */
 /* NO se apaga todo a 0.01s. Ese truco quita el mareo y de paso borra la señal
@@ -1464,3 +1444,186 @@ body.en-luces main   { padding: 0; max-width: none; }
 .fila-cotizacion.inactiva .ct-nombre,
 .fila-cotizacion.inactiva .ct-precio,
 .fila-cotizacion.inactiva .ct-codigo { color: var(--tinta-3); }
+
+
+/* ============================================================== La barra == */
+/* Cuatro... seis columnas, y la activa NO se pinta: su icono se desvanece y
+   sube, y en su lugar aterriza una burbuja que viaja por la barra llevandoselo,
+   dentro de una muesca recortada en el borde superior.
+
+   Todo en PORCENTAJE del ancho, nunca en pixeles fijos: la barra mide distinto
+   en cada telefono y los centros tienen que caer donde caiga la columna.
+   Con seis columnas los centros son 8.333 / 25 / 41.667 / 58.333 / 75 / 91.667
+   y la burbuja baja a 44px: en un iPhone de 390 la columna son 65px, y los 52
+   de la referencia se tocaban entre si. */
+
+:root {
+  --barra-fondo:  #143D4A;   /* el timbre de la marca */
+  --barra-alto:   62px;
+  --burbuja:      44px;
+  --burbuja-sube: 21px;      /* cuanto sobresale por encima del borde */
+  --acento-barra: #3FC8DA;   /* el cian de Valle Aventura */
+  --muesca-ancho: 92px;
+}
+
+nav.tabs {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 70;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  height: calc(var(--barra-alto) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--barra-fondo);
+  /* La barra NO recorta lo que sobresale: la burbuja vive fuera de ella. */
+  overflow: visible;
+}
+
+/* La muesca es un AGUJERO, no un adorno: se rellena con el fondo de la PAGINA.
+   Pintarla del color de la barra la convierte en una mancha. */
+.tabs-muesca {
+  position: absolute;
+  top: -1px;
+  width: var(--muesca-ancho);
+  height: 28px;
+  pointer-events: none;
+  transition: left .5s cubic-bezier(.34, 1.45, .64, 1);
+}
+.tabs-muesca path { fill: var(--papel); }
+
+.tabs-burbuja {
+  position: absolute;
+  top: calc(var(--burbuja-sube) * -1);
+  width: var(--burbuja);
+  height: var(--burbuja);
+  border-radius: 50%;
+  background: var(--acento-barra);
+  color: #0D1B2E;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(63, 200, 218, .35);
+  transition: left .5s cubic-bezier(.34, 1.45, .64, 1);
+  /* Sin esto el navegador se queda el gesto para desplazar la pagina y el
+     arrastre no llega nunca. */
+  touch-action: none;
+  cursor: grab;
+  z-index: 2;
+}
+.tabs-burbuja:active { cursor: grabbing; }
+.tabs-burbuja svg { width: 21px; height: 21px; }
+.tabs-burbuja.pop { animation: bubblePop .45s cubic-bezier(.34, 1.45, .64, 1); }
+.tabs-burbuja.lanzar { animation: bubbleLaunch .35s ease-in backwards; opacity: 0; }
+
+nav.tabs button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 0 2px;
+  background: none;
+  border: 0;
+  color: rgba(242, 241, 236, .62);
+  font: 600 9.5px/1.2 var(--fuente);
+  letter-spacing: .01em;
+  cursor: pointer;
+  touch-action: none;
+}
+nav.tabs button svg { width: 21px; height: 21px; transition: opacity .25s, transform .25s; }
+nav.tabs button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+
+/* La activa no se pinta: su icono se va con la burbuja. */
+nav.tabs button[aria-selected="true"] { color: var(--acento-barra); }
+nav.tabs button[aria-selected="true"] svg { opacity: 0; transform: translateY(-10px) scale(.5); }
+
+@keyframes bubblePop    { 0% { transform: scale(.7) } 60% { transform: scale(1.08) } 100% { transform: scale(1) } }
+@keyframes bubbleLaunch { 0% { transform: none; opacity: 1 } 100% { transform: translateY(-70px) scale(.35); opacity: 0 } }
+@keyframes railIn       { 0% { transform: scale(.08); opacity: .85 } 100% { transform: scale(1); opacity: 1 } }
+@keyframes velolIn      { from { opacity: 0 } to { opacity: 1 } }
+
+/* Sitio para la barra Y para la burbuja, que sobresale por encima. */
+body { padding-bottom: calc(var(--barra-alto) + var(--burbuja-sube) + env(safe-area-inset-bottom, 0px) + 8px); }
+
+/* ------------------------------------------------------------- El riel --- */
+.riel-velo {
+  position: fixed; inset: 0; z-index: 68;
+  background: rgba(30, 30, 30, .42);
+  animation: velolIn .25s both;
+}
+.riel {
+  position: fixed;
+  right: 14px;
+  bottom: calc(var(--barra-alto) + env(safe-area-inset-bottom, 0px) + 24px);
+  z-index: 69;
+  width: 60px;
+  padding: 6px 0;
+  border-radius: 999px;
+  background: var(--barra-fondo);
+  animation: railIn .45s cubic-bezier(.3, .8, .3, 1) both;
+  transform-origin: 50% 105%;
+  touch-action: none;
+}
+.riel-muesca {
+  position: absolute;
+  left: -1px;
+  width: 26px; height: 84px;
+  pointer-events: none;
+  transition: top .5s cubic-bezier(.34, 1.45, .64, 1);
+}
+/* Dos capas: el fondo de la pagina y encima el mismo velo. Con una sola se ve
+   un parche claro flotando sobre lo oscurecido. */
+.riel-muesca .base { fill: var(--papel); }
+.riel-muesca .velo { fill: rgba(30, 30, 30, .42); }
+
+.riel-burbuja {
+  position: absolute;
+  left: -21px;
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  background: var(--acento-barra);
+  color: #0D1B2E;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 6px 18px rgba(63, 200, 218, .35);
+  transition: top .5s cubic-bezier(.34, 1.45, .64, 1);
+  z-index: 2;
+}
+.riel-burbuja svg { width: 20px; height: 20px; }
+
+.riel-fila {
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(242, 241, 236, .62);
+}
+.riel-fila svg { width: 20px; height: 20px; }
+.riel-sep { height: 1px; margin: 5px auto; width: 22px; background: rgba(242, 241, 236, .22); }
+
+/* La etiqueta ES el boton de entrar. Con iconos solos, entrar de un toque es
+   entrar a ciegas. */
+.riel-tag {
+  position: fixed;
+  right: 74px;
+  z-index: 69;
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 9px 14px;
+  border-radius: 12px;
+  background: var(--barra-fondo);
+  color: var(--hoja);
+  border: 0;
+  font: 700 14px/1.2 var(--fuente);
+  text-align: left;
+  cursor: pointer;
+  transition: top .5s cubic-bezier(.34, 1.45, .64, 1);
+}
+.riel-tag small {
+  font: 800 9px/1 var(--fuente);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--acento-barra);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabs-burbuja, .tabs-muesca, .riel-burbuja, .riel-muesca, .riel-tag { transition: none }
+  .riel, .riel-velo, .tabs-burbuja.pop { animation: none }
+}

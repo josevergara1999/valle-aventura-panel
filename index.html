@@ -14,12 +14,12 @@
      Al cambiar el número cambia la dirección, y una dirección nueva no está en
      ninguna caché. Se sube junto con `LZ_VER` de `luces.js`, que lo enseña en
      una esquina del mapa para poder comprobarlo de un vistazo. -->
-<link rel="stylesheet" href="tokens.css?v=24">
-<link rel="stylesheet" href="styles.css?v=24">
+<link rel="stylesheet" href="tokens.css?v=25">
+<link rel="stylesheet" href="styles.css?v=25">
 <!-- El pallet va en su propio archivo por tamaño, no por color: consume
      los mismos tokens que el resto, así que la paleta se sigue cambiando
      desde tokens.css y nada más. -->
-<link rel="stylesheet" href="pallet.css?v=24">
+<link rel="stylesheet" href="pallet.css?v=25">
 </head>
 <body>
 <!--
@@ -386,24 +386,18 @@ finish review, the verdict, and DESIGN.md
   <!-- Cuatro destinos, uno por trabajo: lo que pasa, lo que hay que limpiar, lo
        que entró y lo que cuesta. El cotizador sigue sin ser un destino: es una
        herramienta de Precios. -->
-  <nav class="tabs" role="tablist">
-    <button type="button" role="tab" data-vista="calendario" aria-selected="true">Agenda</button>
-    <button type="button" role="tab" data-vista="huespedes" aria-selected="false">Huespedes<span id="hu-badge" class="hu-badge" hidden></span></button>
-    <button type="button" role="tab" data-vista="luces"      aria-selected="false">Luces</button>
-    <button type="button" role="tab" data-vista="aseos"      aria-selected="false">Aseos</button>
-    <button type="button" role="tab" data-vista="finanzas"   aria-selected="false">Finanzas</button>
-    <button type="button" role="tab" data-vista="cotizaciones" aria-selected="false">Cotizas</button>
-    <button type="button" role="tab" data-vista="tarifas"    aria-selected="false">Precios</button>
-    <button type="button" role="tab" data-vista="avisos"     aria-selected="false">Avisos</button>
+  <nav class="tabs" role="tablist" aria-label="Secciones">
+    <span id="hu-badge" class="hu-badge" hidden></span>
   </nav>
 </div>
 
-<script src="config.js?v=24"></script>
-<script src="pallet.js?v=24"></script>
+<script src="config.js?v=25"></script>
+<script src="pallet.js?v=25"></script>
 <!-- El mapa del complejo, antes que `app.js` para que `LZ` ya exista cuando
      arranca el panel. Es el diseño de Claude Design portado a JavaScript a
      secas: sus estilos y posiciones van tal cual, solo cambia el motor. -->
-<script src="luces.js?v=24"></script>
-<script src="app.js?v=24"></script>
+<script src="luces.js?v=25"></script>
+<script src="app.js?v=25"></script>
+<script src="menu.js?v=25"></script>
 </body>
 </html>

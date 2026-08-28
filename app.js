@@ -4163,32 +4163,35 @@ async function elGuardarAparato(id, campos) {
 })();
 
 /* -------------------------------------------------------------- Pestanas -- */
-document.querySelectorAll("nav.tabs button").forEach((b) => {
-  b.addEventListener("click", () => {
-    document.querySelectorAll("nav.tabs button")
-      .forEach((x) => x.setAttribute("aria-selected", String(x === b)));
-    ["calendario", "huespedes", "luces", "aseos", "finanzas", "cotizaciones", "tarifas", "avisos"].forEach((v) => {
-      $(`#vista-${v}`).hidden = v !== b.dataset.vista;
-    });
-    /* En Luces se esconde la cabecera. Es la unica pantalla donde lo de
-       alrededor no aporta: el precio base y el minimo de noches no ayudan a
-       decidir que luz encender, y esos pixeles son terreno del mapa. Se marca
-       ANTES de pintar para que el mapa se mida ya con su tamanio final. */
-    document.body.classList.toggle("en-luces", b.dataset.vista === "luces");
+/* La barra la dibuja `menu.js`: burbuja que viaja, muesca recortada y riel
+   lateral. Aqui solo queda CAMBIAR DE PANTALLA, expuesto como una funcion para
+   que la barra —o cualquier otra cosa— pueda pedirlo sin saber como se pinta. */
+const VISTAS = ["calendario", "huespedes", "luces", "aseos", "finanzas",
+                "cotizaciones", "tarifas", "avisos"];
 
-    if (b.dataset.vista === "huespedes") pintarHuespedes();
-    if (b.dataset.vista === "luces")     pintarLuces();
-    if (b.dataset.vista === "avisos")    pintarAvisos();
-    if (b.dataset.vista === "tarifas")  pintarTarifas();
-    if (b.dataset.vista === "aseos")    pintarAseos();
-    if (b.dataset.vista === "finanzas") pintarFinanzas();
-    if (b.dataset.vista === "cotizaciones") {
-      cargarCotizaciones().then(pintarCotizaciones)
-        .catch((err) => avisarEn("#aviso-cotizaciones", err.message, "error"));
-    }
-    window.scrollTo(0, 0);
-  });
-});
+function irA(vista) {
+  if (!VISTAS.includes(vista)) return;
+  VISTAS.forEach((v) => { $(`#vista-${v}`).hidden = v !== vista; });
+
+  /* En Luces se esconde la cabecera. Es la unica pantalla donde lo de
+     alrededor no aporta: el precio base y el minimo de noches no ayudan a
+     decidir que luz encender, y esos pixeles son terreno del mapa. Se marca
+     ANTES de pintar para que el mapa se mida ya con su tamanio final. */
+  document.body.classList.toggle("en-luces", vista === "luces");
+
+  if (vista === "huespedes")    pintarHuespedes();
+  if (vista === "luces")        pintarLuces();
+  if (vista === "avisos")       pintarAvisos();
+  if (vista === "tarifas")      pintarTarifas();
+  if (vista === "aseos")        pintarAseos();
+  if (vista === "finanzas")     pintarFinanzas();
+  if (vista === "cotizaciones") {
+    cargarCotizaciones().then(pintarCotizaciones)
+      .catch((err) => avisarEn("#aviso-cotizaciones", err.message, "error"));
+  }
+  window.scrollTo(0, 0);
+}
+window.VA_IR = irA;
 
 /* -------------------------------------------------------------- Arranque -- */
 function mostrarLogin() { $("#login").hidden = false; $("#app").hidden = true; }
