@@ -4236,7 +4236,13 @@ async function iniciar() {
     /* Antes decia siempre "Base $180.000", pasara lo que pasara. En abril eso
        era mentira: se cobraban $100.000 y la cabecera seguia diciendo 180. Lo
        que tiene que estar arriba del todo es lo que se cobra HOY. */
+    /* La version que corre, al lado del precio. Es un dato de dos digitos y
+       resuelve la pregunta "esto que veo, es lo nuevo o lo de anteayer?" sin
+       tener que preguntarla. */
+    const VER = (document.querySelector('script[src*="app.js"]') || {}).src || "";
+    const nv = (VER.match(/v=(\d+)/) || [])[1];
     const h = st.tarifaHoy;
+    if (nv) $("#version-panel").textContent = "v" + nv;
     $("#sub-header").textContent = h && h.nombre
       ? `${h.nombre} ${clp(h.precio_base)} - minimo ${st.reglas.minimo_noches} noches`
       : `Base ${clp(st.tarifaBase.precio_base)} - minimo ${st.reglas.minimo_noches} noches`;
@@ -4250,5 +4256,22 @@ async function iniciar() {
 
 if (sesion?.access_token) iniciar(); else mostrarLogin();
 
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+
+  /* Cuando entra una version nueva, el worker avisa y la pagina se recarga
+     sola. Sin esto, la app instalada en el telefono se queda con la de hace
+     tres despliegues y no hay forma de refrescarla desde ahi.
+
+     Una sola vez por version: se apunta cual se recargo, o dos pestañas
+     abiertas se recargarian la una a la otra sin parar. */
+  navigator.serviceWorker.addEventListener("message", (e) => {
+    if (!e.data || e.data.tipo !== "sw-actualizado") return;
+    try {
+      if (sessionStorage.getItem("va-recargado") === e.data.cache) return;
+      sessionStorage.setItem("va-recargado", e.data.cache);
+    } catch (_) {}
+    location.reload();
+  });
+}
 })();

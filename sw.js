@@ -7,7 +7,7 @@
    —caché primero— el teléfono seguiría abriendo la versión vieja después de
    cada despliegue, que es exactamente el problema que ya apareció en Inmersia. */
 
-const CACHE = "valle-panel-v25";
+const CACHE = "valle-panel-v26";
 const SHELL = [
   "./index.html", "./tokens.css", "./styles.css", "./app.js",
   "./luces.js", "./config.js", "./manifest.webmanifest",
@@ -28,6 +28,12 @@ self.addEventListener("activate", (e) => {
     caches.keys()
       .then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
+      /* Y AVISAR. `clients.claim()` hace que el worker nuevo mande, pero la
+         pagina que ya esta abierta sigue siendo la vieja: en un iPhone con la
+         app instalada, esa pagina puede vivir dias sin recargarse, y desde el
+         telefono no hay forma de forzarla. Con este aviso se recarga sola. */
+      .then(() => self.clients.matchAll({ type: "window" }))
+      .then((cs) => cs.forEach((c) => c.postMessage({ tipo: "sw-actualizado", cache: CACHE })))
   );
 });
 
