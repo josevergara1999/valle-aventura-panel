@@ -1660,3 +1660,56 @@ body { padding-bottom: calc(var(--barra-alto) + var(--burbuja-sube) + env(safe-a
   .tabs-burbuja, .tabs-muesca, .riel-burbuja, .riel-muesca, .riel-tag { transition: none }
   .riel, .riel-velo, .tabs-burbuja.pop { animation: none }
 }
+
+
+/* ---------------------------------------------------------------- Atlas -- */
+/* La pantalla de lo que hace Atlas solo. El bloque de estado va PRIMERO y con
+   punto de color porque es lo unico que cambia el significado de todo lo demas:
+   una lista de reservas con Atlas caido es historia, no un estado al dia. */
+.at-estado {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--hoja); border: 1px solid var(--raya);
+  border-left: 3px solid var(--tinta-3);
+  border-radius: var(--radio); padding: 15px 16px;
+}
+.at-estado b { font-size: 15px; }
+.at-estado.vivo        { border-left-color: var(--ok); }
+.at-estado.caido       { border-left-color: var(--error); }
+.at-estado.desconocido { border-left-color: var(--alerta); }
+.at-punto { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: var(--tinta-3); }
+.at-estado.vivo  .at-punto { background: var(--ok); animation: at-latir 2.4s ease-in-out infinite; }
+.at-estado.caido .at-punto { background: var(--error); }
+.at-estado.desconocido .at-punto { background: var(--alerta); }
+/* Late despacio: es un indicador de fondo, no algo que reclame atencion. */
+@keyframes at-latir { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) {
+  .at-estado.vivo .at-punto { animation: none; }
+}
+
+.at-resumen {
+  display: flex; align-items: center; gap: 16px; margin-top: 12px;
+  background: var(--hoja); border: 1px solid var(--raya);
+  border-radius: var(--radio); padding: 15px 16px;
+}
+.at-numero { font-size: 34px; font-weight: 600; line-height: 1; color: var(--timbre); }
+.at-resumen b { font-size: 14px; font-weight: 600; }
+
+.at-problemas { display: flex; flex-direction: column; gap: 8px; }
+.at-problema {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  background: var(--hoja); border: 1px solid var(--raya);
+  border-left: 3px solid var(--error);
+  border-radius: var(--radio-chico); padding: 13px 15px;
+}
+.at-problema b { font-size: 14px; font-weight: 600; }
+.at-problema button { flex-shrink: 0; min-height: var(--toque); border-radius: 999px; padding: 0 16px; font-size: 13px; }
+
+.at-lista { display: flex; flex-direction: column; gap: 8px; }
+.at-fila {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  background: var(--hoja); border: 1px solid var(--raya);
+  border-radius: var(--radio-chico); padding: 13px 15px;
+}
+.at-fila b { font-size: 14px; font-weight: 600; }
+.at-cuando { font-size: 12px; color: var(--tinta-3); flex-shrink: 0; }
+.at-todo-ok { font-size: 13px; color: var(--tinta-3); margin-top: 18px; }

@@ -66,6 +66,8 @@
     { v: 'tarifas',  t: 'Precios',  g: 'Dinero',  i: 'etiqueta' },
     { sep: true },
     { v: 'avisos',   t: 'Avisos',   g: 'Ajustes', i: 'campana' },
+    { sep: true },
+    { v: 'atlas',    t: 'Atlas',    g: 'Atlas',   i: 'chispa' },
   ];
 
   const N = BARRA.length;
@@ -81,6 +83,7 @@
     mas:        '<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/>',
     billete:    '<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 10v4M18 10v4"/>',
     etiqueta:   '<path d="M20.5 13.3 13.3 20.5a2 2 0 0 1-2.8 0l-7-7A2 2 0 0 1 3 12V4.5A1.5 1.5 0 0 1 4.5 3H12a2 2 0 0 1 1.4.6l7.1 7.1a2 2 0 0 1 0 2.6Z"/><circle cx="7.5" cy="7.5" r="1.3"/>',
+    chispa:     '<path d="M12 2.5 14 9l6.5 2-6.5 2-2 6.5-2-6.5L3.5 11 10 9Z"/><path d="M18.5 3v3M20 4.5h-3"/>',
     campana:    '<path d="M18 8.5a6 6 0 1 0-12 0c0 6-2.5 7.5-2.5 7.5h17S18 14.5 18 8.5"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/>',
   };
   const svg = (n) =>

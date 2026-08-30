@@ -3862,6 +3862,152 @@ const CATEGORIAS = [
   { id: "alarmas",   nombre: "Alarmas",                detalle: "Armar, desarmar y — sobre todo — cuando salta una" },
 ];
 
+/* ------------------------------------------------------------------ Atlas -- */
+/* Que ha hecho Atlas con las reservas de Airbnb.
+
+   Atlas las ingresa SOLO, sin preguntar. Se decidio asi el 30-ago-2026 porque
+   el paso manual era justamente el que fallaba: de 36 reservas de Airbnb entre
+   abril y agosto, solo 3 habian llegado al panel. Esta pantalla es la rendicion
+   de cuentas de eso — cuantas puso, cuales dieron problema y cuando.
+
+   Los problemas van ARRIBA y con boton para cerrarlos. Son los dos unicos casos
+   en que Atlas no ingresa nada y hace falta que decidas tu: un choque de fechas
+   o un anuncio de Airbnb que no reconoce. Todo lo demas es historial.
+
+   Las reservas suyas se reconocen por la NOTA, que lleva el codigo de Airbnb
+   ("Airbnb HMKAHTSE3N"). Mirar el canal no serviria: una reserva de Airbnb que
+   teclees tu tambien lleva canal='airbnb'. */
+
+async function pintarAtlas() {
+  const caja = $("#vista-atlas");
+  if (!caja) return;
+  caja.innerHTML = '<h2 class="titulo-seccion">Atlas</h2>'
+                 + '<p class="av-sub">Cargando...</p>';
+
+  /* El latido puede fallar por algo tan mundano como que el SQL todavia no se
+     haya corrido. Va aparte de las otras dos consultas para que eso no tumbe la
+     pantalla entera: sin latido se pinta "no lo se", que es honesto, en vez de
+     un error. */
+  let latido = null;
+  try {
+    const f = await api("atlas_latido?select=visto_at,nota&id=eq.atlas");
+    latido = (f && f[0]) || null;
+  } catch (e) { latido = null; }
+
+  let puestas = [], problemas = [];
+  try {
+    [puestas, problemas] = await Promise.all([
+      api("bloqueos?select=id,nombre,cabana_id,desde,hasta,creado_at"
+        + "&nota=like.Airbnb*&order=creado_at.desc&limit=60"),
+      api("avisos?select=id,tipo,titulo,cuerpo,creado_at,leido"
+        + "&tipo=in.(atlas_choque,atlas_desconocido)&order=creado_at.desc&limit=40"),
+    ]);
+  } catch (e) {
+    caja.innerHTML = '<h2 class="titulo-seccion">Atlas</h2>'
+      + '<p class="av-sub">No pude leer el panel: ' + esc(e.message) + "</p>";
+    return;
+  }
+
+  puestas = puestas || [];
+  problemas = problemas || [];
+  const abiertos = problemas.filter((p) => !p.leido);
+
+  const ultima = puestas[0]
+    ? "La ultima, " + esc(puestas[0].nombre || "") + ", " + huHace(puestas[0].creado_at) + "."
+    : "Todavia no ha ingresado ninguna.";
+
+  const filaProblema = (p) => `
+    <div class="at-problema">
+      <div class="at-problema-txt">
+        <b>${esc(p.titulo)}</b>
+        <div class="av-sub">${esc(p.cuerpo)}</div>
+        <div class="at-cuando">${huHace(p.creado_at)}</div>
+      </div>
+      <button type="button" class="secundario" data-visto="${p.id}">Visto</button>
+    </div>`;
+
+  const filaPuesta = (b) => `
+    <div class="at-fila">
+      <div>
+        <b>${esc(b.nombre || "Reserva")}</b>
+        <div class="av-sub">${esc(nombreCabana(b.cabana_id))} &middot; ${fechaCorta(b.desde)} al ${fechaCorta(b.hasta)}</div>
+      </div>
+      <span class="at-cuando">${huHace(b.creado_at)}</span>
+    </div>`;
+
+  /* Vivo o no. Doce minutos son dos vueltas y pico del detector (que corre
+     cada cinco), asi que una vuelta lenta por una consulta IMAP pesada no lo
+     pinta como caido. */
+  const min = latido
+    ? Math.round((Date.now() - new Date(latido.visto_at).getTime()) / 60000)
+    : null;
+  const vivo = min !== null && min < 12;
+  const estadoTxt = min === null
+    ? "No lo se todavia. Falta correr <code>db/atlas-latido.sql</code> en Supabase."
+    : (vivo
+        ? "Revisando el correo cada 5 minutos. Ultima vuelta " + huHace(latido.visto_at) + "."
+        : "Sin señales desde " + huHace(latido.visto_at)
+          + ". Mientras este asi, las reservas de Airbnb NO se estan ingresando.");
+
+  caja.innerHTML = `
+    <h2 class="titulo-seccion">Atlas</h2>
+
+    <div class="at-estado ${min === null ? "desconocido" : (vivo ? "vivo" : "caido")}">
+      <span class="at-punto"></span>
+      <div>
+        <b>${min === null ? "Estado desconocido" : (vivo ? "Live" : "Desconectado")}</b>
+        <div class="av-sub">${estadoTxt}</div>
+      </div>
+    </div>
+
+    <div class="at-resumen">
+      <div class="at-numero">${puestas.length}</div>
+      <div>
+        <b>reserva${puestas.length === 1 ? "" : "s"} de Airbnb ingresada${puestas.length === 1 ? "" : "s"}</b>
+        <div class="av-sub">${ultima}</div>
+      </div>
+    </div>
+
+    ${abiertos.length ? `
+      <h2 class="titulo-seccion" style="margin-top:26px">
+        Necesitan que decidas tu (${abiertos.length})
+      </h2>
+      <div class="at-problemas">${abiertos.map(filaProblema).join("")}</div>` : `
+      <p class="at-todo-ok">Sin problemas pendientes. Atlas pudo ingresarlo todo.</p>`}
+
+    <h2 class="titulo-seccion" style="margin-top:26px">Lo que ha ingresado</h2>
+    <div class="at-lista">
+      ${puestas.length
+        ? puestas.map(filaPuesta).join("")
+        : '<p class="av-sub">Nada todavia. Atlas revisa el correo cada 5 minutos.</p>'}
+    </div>
+
+    <p class="av-nota">Atlas ingresa las reservas de Airbnb solo, sin preguntar.
+      Quedan con origen manual, asi que puedes editarlas o borrarlas desde el
+      calendario como cualquier otra. Lo unico que no hace solo es resolver un
+      choque de fechas.</p>`;
+
+  caja.querySelectorAll("[data-visto]").forEach((b) =>
+    b.addEventListener("click", () => atlasVisto(b.dataset.visto)));
+}
+
+/* "Visto" no borra el aviso, lo marca leido: el historial de que fallo y cuando
+   es justo lo que hace falta para no repetir el mismo problema. */
+async function atlasVisto(id) {
+  try {
+    await api("avisos?id=eq." + encodeURIComponent(id), {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ leido: true }),
+    });
+  } catch (e) {
+    avisar("No pude marcarlo: " + e.message, "error");
+    return;
+  }
+  await pintarAtlas();
+}
+
+
 async function pintarAvisos() {
   const caja = $("#vista-avisos");
   if (!caja) return;
@@ -4196,7 +4342,7 @@ async function elGuardarAparato(id, campos) {
    lateral. Aqui solo queda CAMBIAR DE PANTALLA, expuesto como una funcion para
    que la barra —o cualquier otra cosa— pueda pedirlo sin saber como se pinta. */
 const VISTAS = ["calendario", "huespedes", "luces", "aseos", "finanzas",
-                "cotizaciones", "tarifas", "avisos"];
+                "cotizaciones", "tarifas", "avisos", "atlas"];
 
 function irA(vista) {
   if (!VISTAS.includes(vista)) return;
@@ -4211,6 +4357,7 @@ function irA(vista) {
   if (vista === "huespedes")    pintarHuespedes();
   if (vista === "luces")        pintarLuces();
   if (vista === "avisos")       pintarAvisos();
+  if (vista === "atlas")        pintarAtlas();
   if (vista === "tarifas")      pintarTarifas();
   if (vista === "aseos")        pintarAseos();
   if (vista === "finanzas")     pintarFinanzas();
