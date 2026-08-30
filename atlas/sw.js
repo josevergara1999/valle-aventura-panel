@@ -17,12 +17,16 @@
    que esta pantalla existe para responder. Las llamadas a Supabase van siempre
    a la red y, si fallan, se ve el fallo.
 
-   El push NO se maneja aqui todavia. Ver el encabezado de app.js: mientras la
-   Edge Function `avisos` reparta cada aviso a todos los dispositivos sin
-   distinguir de que app vino la suscripcion, suscribirse aqui haria sonar el
-   telefono dos veces por el mismo hecho. */
+   3. Mostrar los avisos de Atlas (desde el 30-ago-2026). El service worker es
+      lo unico que sigue vivo con la app cerrada, asi que las notificaciones se
+      muestran aqui o no se muestran.
 
-const CACHE = "atlas-v2";
+      Aqui SOLO llegan los avisos de Atlas, y no porque se filtren: llegan los
+      que la Edge Function manda a ESTA suscripcion, y desde
+      `db/push-por-app.sql` solo le manda los de `destino = 'atlas'`. El panel
+      tiene la suya aparte y recibe los suyos. */
+
+const CACHE = "atlas-v3";
 
 /* Solo lo propio y los dos archivos del panel de los que depende. Si alguno
    cambia, sube el numero de CACHE y se descarta el viejo entero. */
@@ -78,4 +82,50 @@ self.addEventListener("fetch", (e) => {
       })
       .catch(() => caches.match(req).then((r) => r || caches.match("./index.html")))
   );
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Los avisos
+   ═══════════════════════════════════════════════════════════════════════════
+   Llegan cifrados desde la Edge Function `avisos` (RFC 8291). Se muestran con
+   el mismo criterio que en el panel para que un aviso no se comporte distinto
+   segun por que app entre. */
+
+self.addEventListener("push", (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { titulo: "Atlas", cuerpo: "" }; }
+
+  const urgente = d.urgencia === "alta";
+
+  e.waitUntil(self.registration.showNotification(d.titulo || "Atlas", {
+    body: d.cuerpo || "",
+    icon: "./icono-192.png",
+    badge: "./icono-192.png",
+    /* Agrupados salvo los urgentes. Aqui pesa mas que en el panel: si Atlas
+       ingresa cuatro reservas de una tacada al ponerse al dia tras un apagon,
+       son cuatro avisos del mismo hecho —"me puse al dia"— y apilarlos llena
+       la pantalla de bloqueo. Un choque de fechas SI merece su propia linea,
+       porque cada uno necesita que Jose decida algo distinto. */
+    tag: urgente ? undefined : "atlas",
+    renotify: urgente,
+    requireInteraction: urgente,
+    vibrate: urgente ? [200, 80, 200] : [100],
+    data: { id: d.id },
+  }));
+});
+
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  e.waitUntil((async () => {
+    /* `includeUncontrolled` devuelve todas las ventanas del dominio, las del
+       panel incluidas. Se filtra por el scope: un aviso de Atlas tiene que
+       abrir la app de Atlas, no enfocar el panel que estuviera abierto detras
+       y dejar al usuario mirando otra pantalla. */
+    const raiz = self.registration.scope;
+    const abiertas = await clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const c of abiertas) {
+      if (c.url.startsWith(raiz)) { await c.focus(); return; }
+    }
+    await clients.openWindow("./index.html");
+  })());
 });

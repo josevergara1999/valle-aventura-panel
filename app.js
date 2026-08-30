@@ -3815,6 +3815,11 @@ async function avisosActivar() {
         p256dh: j.keys.p256dh,
         auth: j.keys.auth,
         etiqueta: nombreDispositivo(),
+        /* De que app viene esta suscripcion. Sin esto, la Edge Function no
+           puede distinguirla de la que crea la app de Atlas —mismo dominio,
+           misma cuenta— y el mismo aviso sonaria dos veces en el teléfono que
+           tenga las dos instaladas. Ver `db/push-por-app.sql`. */
+        app: "panel",
         activo: true,
         fallos: 0,
       }),

@@ -1,7 +1,13 @@
 /* Envío de avisos al teléfono — Supabase Edge Function.
  *
- * Lee la cola `avisos` y manda una notificación push a cada dispositivo
- * registrado. Se llama por cron cada minuto.
+ * Lee la cola `avisos` y manda una notificación push a los dispositivos que
+ * toquen. Se llama por cron cada minuto.
+ *
+ * QUÉ SIGNIFICA "LOS QUE TOQUEN"
+ * ------------------------------
+ * Hasta el 30-ago-2026 era "todos". Desde que existe la app de Atlas, cada
+ * aviso va solo a las suscripciones de la app a la que pertenece — ver
+ * `destinatarios()` más abajo y `db/push-por-app.sql`.
  *
  * POR QUÉ ESTÁ ESCRITO A MANO Y NO CON UNA LIBRERÍA
  * ------------------------------------------------
@@ -166,6 +172,38 @@ async function enviar(disp: any, aviso: any): Promise<number> {
   return r.status;
 }
 
+// ── A quién le toca cada aviso ─────────────────────────────────────────────
+/* Desde el 30-ago-2026 hay DOS apps instalables en el mismo dominio: el panel
+ * (`/`) y Atlas (`/atlas/`). Cada una se instala aparte y crea su propia
+ * suscripción, así que un mismo teléfono puede tener dos filas en
+ * `push_dispositivos`. Mandarle el aviso a las dos lo haría sonar dos veces
+ * por el mismo hecho, y ese es el camino más corto a que José silencie el
+ * sistema entero y deje de enterarse también de lo que sí importa.
+ *
+ * El aviso YA dice a dónde va: `destino` es el campo con el que el service
+ * worker decide qué pantalla abrir al tocarlo, y los dos únicos sitios que
+ * escriben avisos de Atlas —el trigger `tg_aviso_reserva` y `valle_airbnb.py`—
+ * ponen 'atlas'. Se reutiliza en vez de inventar un segundo campo para lo
+ * mismo, que un día acabaría contradiciendo al primero. */
+const appDelAviso = (aviso: any): string => (aviso?.destino === 'atlas' ? 'atlas' : 'panel');
+
+/* EL RESPALDO NO ES UN ADORNO. Mientras la app de Atlas no esté instalada en
+ * ningún teléfono, sus avisos tienen que seguir llegando por el panel, que es
+ * como funcionaba hasta hoy: desplegar esto no puede dejar a José sin el aviso
+ * de que entró una reserva de Airbnb. Y protege también el día que la
+ * desinstale o le limpie los datos.
+ *
+ * Al revés NO se hace: un aviso del panel no cae en la app de Atlas si no hay
+ * panel instalado. Esa pantalla responde dos preguntas sobre Atlas y nada más;
+ * enseñarle ahí "Piden pellet · Cabaña Nevados" y que al tocarlo no lleve a
+ * ninguna parte es peor que no enseñarlo. */
+function destinatarios(disps: any[], app: string): any[] {
+  const propios = disps.filter((d) => (d.app ?? 'panel') === app);
+  if (propios.length) return propios;
+  if (app === 'panel') return [];
+  return disps.filter((d) => (d.app ?? 'panel') === 'panel');
+}
+
 // ── Acceso a la base ───────────────────────────────────────────────────────
 const api = (ruta: string, opts: RequestInit = {}) =>
   fetch(`${SB_URL}/rest/v1/${ruta}`, {
@@ -203,8 +241,16 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ avisos: avisos?.length ?? 0, dispositivos: 0 }), { status: 200 });
   }
 
-  let ok = 0, fallos = 0, repetidos = 0;
+  let ok = 0, fallos = 0, repetidos = 0, sinDestino = 0;
   for (const aviso of (avisos ?? [])) {
+    /* A quien va ANTES de reservarlo. Si no hay ni un telefono al que mandarlo
+       se deja pendiente sin tocar: reservarlo obligaria a devolverlo a la cola
+       despues, y ese ida y vuelta por cada pasada del cron —una por minuto— no
+       compra nada. Se queda en la cola y `avisos_caducar()` lo retira a las 6h,
+       que es lo mismo que pasaba cuando no habia ningun dispositivo. */
+    const aQuien = destinatarios(disps, appDelAviso(aviso));
+    if (!aQuien.length) { sinDestino++; continue; }
+
     /* RESERVAR EL AVISO ANTES DE MANDARLO
      * ----------------------------------
      * Antes se marcaba enviado DESPUES de mandarlo, y en ese hueco cabia otra
@@ -228,7 +274,7 @@ Deno.serve(async (req) => {
     if (!Array.isArray(reservadas) || reservadas.length === 0) { repetidos++; continue; }
 
     let alguno = false;
-    for (const d of disps) {
+    for (const d of aQuien) {
       try {
         const st = await enviar(d, aviso);
         if (st >= 200 && st < 300) {
@@ -266,7 +312,16 @@ Deno.serve(async (req) => {
     }
   }
 
-  return new Response(JSON.stringify({ enviados: ok, fallos, repetidos, dispositivos: disps.length }), {
+  /* El desglose por app no es adorno: es lo unico que permite comprobar de un
+     vistazo, tras desplegar, que el reparto quedo como se queria y que la app
+     de Atlas ya cuenta como destino. */
+  const porApp: Record<string, number> = {};
+  for (const d of disps) porApp[d.app ?? 'panel'] = (porApp[d.app ?? 'panel'] ?? 0) + 1;
+
+  return new Response(JSON.stringify({
+    enviados: ok, fallos, repetidos, sinDestino,
+    dispositivos: disps.length, porApp,
+  }), {
     status: 200, headers: { 'Content-Type': 'application/json' },
   });
 });

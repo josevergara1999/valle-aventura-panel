@@ -8,7 +8,7 @@
 <!-- `scope` es /atlas/, asi que al instalarla queda como una app aparte del
      panel: icono propio, ventana propia y su propio service worker. Comparten
      dominio y sesion, que es justo lo comodo — se inicia sesion una vez. -->
-<link rel="manifest" href="manifest.webmanifest?v=32">
+<link rel="manifest" href="manifest.webmanifest?v=33">
 <meta name="theme-color" content="#143D4A">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -17,8 +17,8 @@
 
 <!-- La paleta vive en el panel y se lee de ahi. Duplicarla seria tener dos
      identidades visuales que se separan a la primera que alguien retoque una. -->
-<link rel="stylesheet" href="../tokens.css?v=32">
-<link rel="stylesheet" href="estilos.css?v=32">
+<link rel="stylesheet" href="../tokens.css?v=33">
+<link rel="stylesheet" href="estilos.css?v=33">
 </head>
 <body>
 
@@ -33,6 +33,17 @@
       <b id="estado-titulo">Cargando…</b>
       <div class="sub" id="estado-sub"></div>
     </div>
+  </section>
+
+  <!-- Debajo del estado y mas discreto que el: es un ajuste que se toca una
+       vez, no una de las dos preguntas que esta pantalla existe para responder.
+       Pero va arriba y no al final, porque si no se ve no se activa. -->
+  <section id="avisos" class="tarjeta-avisos" hidden>
+    <div>
+      <b id="avisos-titulo"></b>
+      <div class="sub" id="avisos-sub"></div>
+    </div>
+    <button type="button" id="avisos-boton" hidden></button>
   </section>
 
   <h2 class="rotulo">Lo que ha hecho</h2>
@@ -51,7 +62,7 @@
 
 <p id="cargando" class="sub centrado">Abriendo…</p>
 
-<script src="../config.js?v=32"></script>
-<script src="app.js?v=32"></script>
+<script src="../config.js?v=33"></script>
+<script src="app.js?v=33"></script>
 </body>
 </html>

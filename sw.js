@@ -7,7 +7,7 @@
    —caché primero— el teléfono seguiría abriendo la versión vieja después de
    cada despliegue, que es exactamente el problema que ya apareció en Inmersia. */
 
-const CACHE = "valle-panel-v30";
+const CACHE = "valle-panel-v31";
 const SHELL = [
   "./index.html", "./tokens.css", "./styles.css", "./app.js",
   "./luces.js", "./config.js", "./manifest.webmanifest",
@@ -121,9 +121,17 @@ self.addEventListener("notificationclick", (e) => {
     const abiertas = await clients.matchAll({ type: "window", includeUncontrolled: true });
     /* Si el panel ya está abierto se reutiliza esa ventana y se le dice a qué
        pestaña ir. Abrir una segunda copia deja al usuario con dos paneles
-       desincronizados. */
+       desincronizados.
+
+       LA APP DE ATLAS NO CUENTA como panel abierto, aunque viva en el mismo
+       origen: `includeUncontrolled` devuelve TODAS las ventanas del dominio,
+       /atlas/ incluida. Sin este filtro, con la app de Atlas abierta y el panel
+       no, tocar un aviso del panel enfocaba la ventana de Atlas y le mandaba un
+       "ve a huespedes" que esa app no escucha — o sea, el aviso no llevaba a
+       ninguna parte. */
+    const raiz = self.registration.scope;
     for (const c of abiertas) {
-      if (c.url.includes(self.location.origin)) {
+      if (c.url.startsWith(raiz) && !c.url.startsWith(raiz + "atlas/")) {
         await c.focus();
         c.postMessage({ tipo: "ir", destino });
         return;

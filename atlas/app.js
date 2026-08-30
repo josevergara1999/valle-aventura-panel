@@ -13,22 +13,19 @@
    tuneles; la mala es que si el PC esta apagado, aqui se ve — que es
    exactamente lo que queremos que se vea.
 
-   POR QUE TODAVIA NO PIDE PERMISO DE NOTIFICACIONES
-   --------------------------------------------------
-   Porque hoy sonaria dos veces. El panel ya esta suscrito al push y la Edge
-   Function `avisos` reparte cada aviso a TODOS los dispositivos de
-   `push_dispositivos`, sin distinguir de que app vino la suscripcion. Si esta
-   app se suscribiera tambien, el mismo aviso llegaria por partida doble al
-   mismo telefono.
+   LOS AVISOS SON SUYOS DESDE EL 30-AGO-2026
+   -----------------------------------------
+   Al nacer, esta app no pedia permiso de notificaciones: el panel ya estaba
+   suscrito y la Edge Function repartia cada aviso a TODOS los dispositivos sin
+   mirar de que app venia la suscripcion, asi que suscribirse aqui habria hecho
+   sonar el telefono dos veces por el mismo hecho.
 
-   Para separarlos hace falta una columna `app` en `push_dispositivos` y que la
-   Edge Function filtre por ella. Es poco codigo, pero esa funcion es el UNICO
-   camino de entrega de todos los avisos del sistema: romperla deja a Jose sin
-   ninguno y sin enterarse. Se hace despierto y comprobando, no de madrugada.
+   Ya no. `push_dispositivos` tiene una columna `app` y la funcion reparte por
+   ella: aqui llegan los avisos de Atlas (los de destino 'atlas') y solo esos;
+   el resto sigue yendo al panel. Ver `db/push-por-app.sql`.
 
-   Mientras tanto NO se pierde nada: el aviso de que Atlas ingreso una reserva
-   llega igual, lo muestra la app del panel, y al tocarlo lleva a su pantalla de
-   Atlas. Ver `db/atlas-avisa-en-su-nombre.sql`. */
+   Y si esta app no esta instalada en ningun telefono, sus avisos siguen
+   llegando por el panel, como antes. Instalarla es lo que los mueve aqui. */
 
 const $ = (s) => document.querySelector(s);
 const CFG = window.CONFIG || {};
@@ -81,8 +78,17 @@ async function api(ruta, opciones = {}, reintento = false) {
     },
   });
   if (r.status === 401 && !reintento && await refrescar()) return api(ruta, opciones, true);
-  if (!r.ok) throw new Error((await r.text()) || `Error ${r.status}`);
-  return r.status === 204 ? null : r.json();
+
+  /* Se lee el cuerpo como texto y solo se interpreta si hay algo. Mirar el 204
+     no basta: un INSERT correcto en PostgREST responde 201 con el cuerpo VACIO
+     salvo que se le pida representacion, y `r.json()` sobre eso lanza. El
+     efecto era el peor posible — la fila quedaba escrita y la app decia que
+     habia fallado. Mientras esto solo leia no se notaba; desde que registra la
+     suscripcion de avisos, si. Es el mismo criterio que usa el panel. */
+  const txt = await r.text();
+  const d = txt ? JSON.parse(txt) : null;
+  if (!r.ok) throw new Error((d && (d.message || d.hint)) || txt || `Error ${r.status}`);
+  return d;
 }
 
 /* --------------------------------------------------------------- Texto --- */
@@ -127,6 +133,10 @@ async function cargar() {
 
   pintarEstado(latido);
   pintarFeed(avisos);
+  /* Aparte y tragandose el fallo, igual que el latido: esto es un ajuste, y un
+     ajuste que no se pueda pintar no puede tapar lo que la pantalla existe para
+     ensenar. */
+  try { await pintarAvisos(); } catch (e) { /* se vera al recargar */ }
 }
 
 function pintarEstado(latido) {
@@ -198,6 +208,139 @@ async function marcarVisto(id) {
   await cargar();
 }
 
+/* -------------------------------------------------------- Avisos aqui --- */
+/* La misma clave publica que el panel, y tiene que serlo: identifica al
+   servidor que firma los envios, no a la app. Con otra distinta, Apple
+   rechazaria los avisos de esta suscripcion. */
+const VAPID_PUBLICA = "BOOBabMlwesyBFQKK-PjtuoVwaceAeIWYbf6vfw7iLNsXExXQCVs8ASzw-xRcHdvBEB72DsevGsw27znNvk-cEY";
+
+/* La clave publica viaja como bytes, no como texto. */
+function claveABytes(base64) {
+  const relleno = "=".repeat((4 - (base64.length % 4)) % 4);
+  const limpia = (base64 + relleno).replace(/-/g, "+").replace(/_/g, "/");
+  const bin = atob(limpia);
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+}
+
+/* Un nombre reconocible para saber que telefono es cual mirando la tabla. No
+   dice de que app viene: para eso esta la columna `app`, y repetir el dato en
+   dos sitios es garantizar que algun dia se contradigan. */
+function nombreDispositivo() {
+  const ua = navigator.userAgent;
+  const so = /iPhone|iPad/.test(ua) ? "iPhone"
+           : /Android/.test(ua) ? "Android"
+           : /Mac/.test(ua) ? "Mac"
+           : /Windows/.test(ua) ? "Windows" : "Dispositivo";
+  const quien = ((sesion && sesion.user && sesion.user.email) || "").split("@")[0];
+  return quien ? so + " de " + quien : so;
+}
+
+async function avisosEstado() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return "no-soportado";
+  // En iOS, Safari sin instalar no trae PushManager, asi que casi siempre se
+  // sale por la linea de arriba. Esta comprueba lo otro por separado: la linea
+  // siguiente lee `Notification` y si no existiera lanzaria un ReferenceError
+  // que dejaria la tarjeta sin pintar.
+  if (typeof Notification === "undefined") return "no-soportado";
+  if (!window.isSecureContext) return "sin-https";
+  if (Notification.permission === "denied") return "bloqueado";
+  const reg = await navigator.serviceWorker.getRegistration();
+  const sub = reg && await reg.pushManager.getSubscription();
+  return sub ? "activo" : "inactivo";
+}
+
+async function avisosActivar() {
+  const permiso = await Notification.requestPermission();
+  if (permiso !== "granted") { await pintarAvisos(); return; }
+
+  /* `ready` y no `getRegistration`: recien instalada la app el worker puede
+     estar todavia activandose, y suscribirse contra un registro a medias falla
+     con un error que no dice nada. */
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) {
+    sub = await reg.pushManager.subscribe({
+      // Obligatorio en todos los navegadores: no hay push silencioso, siempre
+      // hay que mostrar algo. Aqui nos viene bien.
+      userVisibleOnly: true,
+      applicationServerKey: claveABytes(VAPID_PUBLICA),
+    });
+  }
+
+  const j = sub.toJSON();
+  try {
+    /* `on_conflict` sobre el endpoint: si esta suscripcion ya estaba registrada
+       se actualiza en vez de duplicarse. */
+    await api("push_dispositivos?on_conflict=endpoint", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates, return=minimal" },
+      body: JSON.stringify({
+        endpoint: j.endpoint,
+        p256dh: j.keys.p256dh,
+        auth: j.keys.auth,
+        etiqueta: nombreDispositivo(),
+        // Lo que hace que este telefono reciba los avisos de Atlas por aqui y
+        // deje de recibirlos por el panel. Ver `db/push-por-app.sql`.
+        app: "atlas",
+        activo: true,
+        fallos: 0,
+      }),
+    });
+  } catch (e) {
+    /* Si el registro falla hay que deshacer la suscripcion del navegador. Si no,
+       queda una suscripcion viva que la base no conoce: el estado diria
+       "activo" y no llegaria nunca nada. */
+    try { await sub.unsubscribe(); } catch (_) {}
+    alert("No se pudo activar: " + e.message);
+  }
+  await pintarAvisos();
+}
+
+async function avisosDesactivar() {
+  const reg = await navigator.serviceWorker.getRegistration();
+  const sub = reg && await reg.pushManager.getSubscription();
+  if (sub) {
+    try {
+      await api("push_dispositivos?endpoint=eq." + encodeURIComponent(sub.endpoint), {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ activo: false }),
+      });
+    } catch (e) { /* da igual: lo que importa es cancelarla en el navegador */ }
+    await sub.unsubscribe();
+  }
+  await pintarAvisos();
+}
+
+/* Hablando en primera persona como el resto de la pantalla: quien avisa es
+   Atlas, no "el sistema". */
+const AVISOS_TEXTO = {
+  "activo":       ["Te aviso en este telefono",
+                   "Cuando ingrese una reserva o algo se me atasque, suena aqui."],
+  "inactivo":     ["Aqui no te aviso todavia",
+                   "Activalo y lo mio sonara en esta app en vez de en el panel."],
+  "bloqueado":    ["No me dejas avisarte",
+                   "Bloqueaste las notificaciones para este sitio. Hay que permitirlas en los ajustes."],
+  "sin-https":    ["No puedo avisarte desde aqui",
+                   "Abreme en panel.valleaventura-chile.com para poder activarlo."],
+  "no-soportado": ["Este navegador no admite avisos",
+                   "En el iPhone hay que anadirme a la pantalla de inicio primero."],
+};
+
+async function pintarAvisos() {
+  const estado = await avisosEstado();
+  const texto = AVISOS_TEXTO[estado];
+
+  $("#avisos-titulo").textContent = texto[0];
+  $("#avisos-sub").textContent = texto[1];
+
+  const boton = $("#avisos-boton");
+  boton.hidden = (estado !== "activo" && estado !== "inactivo");
+  boton.textContent = estado === "activo" ? "Desactivar" : "Activar";
+  $("#avisos").className = "tarjeta-avisos " + estado;
+  $("#avisos").hidden = false;
+}
+
 /* -------------------------------------------------------------- Arranque - */
 
 function mostrar(cual) {
@@ -249,3 +392,15 @@ setInterval(() => { if (!document.hidden && sesion) cargar(); }, 60000);
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
+
+/* Un solo oyente, puesto una vez. `pintarAvisos` corre en cada carga —cada
+   minuto mientras la app este delante— y engancharlo ahi apilaria un oyente por
+   vuelta, hasta que un solo toque activara y desactivara a la vez. */
+$("#avisos-boton").addEventListener("click", async () => {
+  const boton = $("#avisos-boton");
+  boton.disabled = true;
+  try {
+    if (await avisosEstado() === "activo") await avisosDesactivar();
+    else await avisosActivar();
+  } finally { boton.disabled = false; }
+});
