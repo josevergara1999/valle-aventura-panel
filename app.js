@@ -3874,9 +3874,10 @@ const CATEGORIAS = [
    en que Atlas no ingresa nada y hace falta que decidas tu: un choque de fechas
    o un anuncio de Airbnb que no reconoce. Todo lo demas es historial.
 
-   Las reservas suyas se reconocen por la NOTA, que lleva el codigo de Airbnb
-   ("Airbnb HMKAHTSE3N"). Mirar el canal no serviria: una reserva de Airbnb que
-   teclees tu tambien lleva canal='airbnb'. */
+   Las reservas suyas se reconocen por la columna `airbnb_codigo`, que solo
+   rellena Atlas y que ademas lleva un indice unico: es lo que hace imposible
+   que la misma reserva entre dos veces. Mirar el canal no serviria — una
+   reserva de Airbnb que teclees tu tambien lleva canal='airbnb'. */
 
 async function pintarAtlas() {
   const caja = $("#vista-atlas");
@@ -3898,9 +3899,10 @@ async function pintarAtlas() {
   try {
     [puestas, problemas] = await Promise.all([
       api("bloqueos?select=id,nombre,cabana_id,desde,hasta,creado_at"
-        + "&nota=like.Airbnb*&order=creado_at.desc&limit=60"),
+        + "&airbnb_codigo=not.is.null&order=creado_at.desc&limit=60"),
       api("avisos?select=id,tipo,titulo,cuerpo,creado_at,leido"
-        + "&tipo=in.(atlas_choque,atlas_desconocido)&order=creado_at.desc&limit=40"),
+        + "&tipo=in.(atlas_choque,atlas_desconocido,atlas_fallo)"
+        + "&order=creado_at.desc&limit=40"),
     ]);
   } catch (e) {
     caja.innerHTML = '<h2 class="titulo-seccion">Atlas</h2>'
