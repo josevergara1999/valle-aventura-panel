@@ -10,6 +10,12 @@
 
 * { box-sizing: border-box; }
 
+/* El atributo `hidden` esconde poniendo display:none desde la hoja del
+   navegador, que pierde contra CUALQUIER regla de autor. Como `.entrar` y
+   `.feed` son flex, sin esto se quedaban visibles aun con hidden puesto — el
+   formulario de entrar salia debajo de la app ya cargada. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   font-family: var(--fuente);

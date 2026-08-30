@@ -154,7 +154,8 @@ function pintarEstado(latido) {
 function pintarFeed(avisos) {
   const caja = $("#feed");
   if (!avisos.length) {
-    caja.innerHTML = '<p class="vacio">Nada todavía.</p>';
+    caja.innerHTML = '<p class="vacio">Nada todavía. Cuando ingrese una reserva '
+      + 'de Airbnb, o cuando algo me falle, aparecerá aquí.</p>';
     $("#nota").textContent = "";
     return;
   }

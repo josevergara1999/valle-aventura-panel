@@ -22,7 +22,7 @@
    distinguir de que app vino la suscripcion, suscribirse aqui haria sonar el
    telefono dos veces por el mismo hecho. */
 
-const CACHE = "atlas-v1";
+const CACHE = "atlas-v2";
 
 /* Solo lo propio y los dos archivos del panel de los que depende. Si alguno
    cambia, sube el numero de CACHE y se descarta el viejo entero. */
