@@ -1,0 +1,99 @@
+/* ============================================================================
+   Atlas — lo que hace cuando no estas mirando
+   ============================================================================
+   Los colores y las medidas salen de `../tokens.css`, el mismo archivo que
+   manda en el panel. Aqui solo hay disposicion.
+
+   La pantalla es una lista y poco mas, a proposito. Esta app no se abre para
+   trabajar: se abre para comprobar en tres segundos que Atlas sigue vivo y ver
+   que ha hecho. Todo lo que se pueda tocar o configurar vive en el panel. */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--fuente);
+  background: var(--papel);
+  color: var(--tinta);
+  -webkit-font-smoothing: antialiased;
+  /* La franja de la muesca del iPhone, para que la cabecera no quede debajo. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+           env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.cabecera {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 18px 12px;
+}
+.cabecera h1 {
+  margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.01em;
+}
+
+/* El punto de la cabecera dice si Atlas esta vivo sin tener que leer nada.
+   Es lo primero que se ve al abrir, y muchas veces lo unico que hace falta. */
+.punto { width: 10px; height: 10px; border-radius: 50%; background: var(--tinta-3); }
+.punto.vivo  { background: var(--ok); animation: latir 2.4s ease-in-out infinite; }
+.punto.caido { background: var(--error); }
+.punto.desconocido { background: var(--alerta); }
+@keyframes latir { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .punto.vivo { animation: none; } }
+
+main { padding: 0 18px 40px; max-width: 620px; margin: 0 auto; }
+
+.tarjeta-estado {
+  background: var(--hoja); border: 1px solid var(--raya);
+  border-left: 3px solid var(--tinta-3);
+  border-radius: var(--radio); padding: 15px 16px;
+}
+.tarjeta-estado.vivo        { border-left-color: var(--ok); }
+.tarjeta-estado.caido       { border-left-color: var(--error); }
+.tarjeta-estado.desconocido { border-left-color: var(--alerta); }
+.tarjeta-estado b { font-size: 16px; }
+
+.sub { font-size: 12.5px; color: var(--tinta-3); line-height: 1.45; margin: 3px 0 0; }
+.centrado { text-align: center; padding: 40px 18px; }
+
+.rotulo {
+  font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--tinta-3); margin: 26px 0 10px;
+}
+
+.feed { display: flex; flex-direction: column; gap: 8px; }
+
+.msg {
+  background: var(--hoja); border: 1px solid var(--raya);
+  border-radius: var(--radio-chico); padding: 13px 15px;
+}
+/* Lo que no pudo hacer se distingue por el filo, no por un icono de alarma:
+   se lee de un vistazo bajando la lista y no grita cuando no hace falta. */
+.msg.problema { border-left: 3px solid var(--error); }
+.msg.problema.visto { border-left-color: var(--raya-fuerte); }
+.msg-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.msg b { font-size: 14px; font-weight: 600; }
+.msg .cuando { font-size: 11.5px; color: var(--tinta-3); flex-shrink: 0; }
+.msg button {
+  margin-top: 10px; min-height: var(--toque); border-radius: 999px;
+  padding: 0 16px; font-size: 13px; font-family: inherit;
+  background: var(--hoja-2); color: var(--tinta);
+  border: 1px solid var(--raya); cursor: pointer;
+}
+
+.vacio { font-size: 13px; color: var(--tinta-3); padding: 6px 0; }
+.nota { font-size: 12px; color: var(--tinta-3); line-height: 1.5; margin-top: 18px; }
+
+.entrar {
+  display: flex; flex-direction: column; gap: 10px;
+  max-width: 340px; margin: 60px auto; padding: 0 18px;
+}
+.entrar input {
+  font-family: inherit; font-size: 16px;  /* 16px o iOS hace zoom al enfocar */
+  padding: 12px 14px; min-height: var(--toque);
+  border: 1px solid var(--raya); border-radius: var(--radio);
+  background: var(--hoja); color: var(--tinta);
+}
+.entrar button {
+  font-family: inherit; font-size: 15px; min-height: var(--toque);
+  border: 0; border-radius: var(--radio);
+  background: var(--timbre); color: var(--tinta-sobre-teal); cursor: pointer;
+}
+.error { color: var(--error); font-size: 13px; margin: 4px 0 0; }

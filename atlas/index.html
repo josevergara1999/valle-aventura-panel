@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Atlas</title>
+
+<!-- `scope` es /atlas/, asi que al instalarla queda como una app aparte del
+     panel: icono propio, ventana propia y su propio service worker. Comparten
+     dominio y sesion, que es justo lo comodo — se inicia sesion una vez. -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#143D4A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Atlas">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<!-- La paleta vive en el panel y se lee de ahi. Duplicarla seria tener dos
+     identidades visuales que se separan a la primera que alguien retoque una. -->
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+
+<header class="cabecera">
+  <h1>Atlas</h1>
+  <span id="estado-punto" class="punto desconocido" title="Estado"></span>
+</header>
+
+<main id="app" hidden>
+  <section id="estado" class="tarjeta-estado desconocido">
+    <div>
+      <b id="estado-titulo">Cargando…</b>
+      <div class="sub" id="estado-sub"></div>
+    </div>
+  </section>
+
+  <h2 class="rotulo">Lo que ha hecho</h2>
+  <div id="feed" class="feed"></div>
+  <p class="nota" id="nota"></p>
+</main>
+
+<!-- Entrar. Misma cuenta del panel: si ya iniciaste sesion ahi, esto ni se ve. -->
+<form id="entrar" class="entrar" hidden autocomplete="on">
+  <p class="sub">Entra con la misma cuenta del panel.</p>
+  <input id="correo" type="email" placeholder="Correo" autocomplete="username" required>
+  <input id="clave" type="password" placeholder="Contraseña" autocomplete="current-password" required>
+  <button type="submit">Entrar</button>
+  <p class="error" id="error-entrar" hidden></p>
+</form>
+
+<p id="cargando" class="sub centrado">Abriendo…</p>
+
+<script src="../config.js?v=31"></script>
+<script src="app.js?v=31"></script>
+</body>
+</html>

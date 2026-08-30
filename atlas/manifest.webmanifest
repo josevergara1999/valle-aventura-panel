@@ -1,0 +1,16 @@
+{
+  "name": "Atlas",
+  "short_name": "Atlas",
+  "description": "Lo que Atlas hace cuando no estás mirando",
+  "start_url": "/atlas/",
+  "scope": "/atlas/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#E7E6E0",
+  "theme_color": "#143D4A",
+  "lang": "es-CL",
+  "icons": [
+    { "src": "icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
