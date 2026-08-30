@@ -4,19 +4,37 @@
 
 html { background: var(--papel); }
 
+/* El rebote de iOS es lo que descolocaba la barra. Al llegar al final, Safari
+   estira la página y se lleva con ella TODO lo anclado al viewport: la barra de
+   abajo subía y la cabecera pegajosa se iba por arriba. No es que la barra se
+   mueva sola — es que la página sigue moviéndose cuando ya no queda nada que
+   desplazar. Sin rebote, no hay a dónde arrastrarla. */
+html, body { overscroll-behavior-y: none; }
+
+/* Dos halos muy suaves sobre el papel: dan la profundidad que en la web hace la
+   foto de fondo, sin cargar una imagen que en la montaña no bajaría.
+   Van en una capa fija propia y NO en `background-attachment: fixed` del body:
+   en iOS ese modo saca el desplazamiento del compositor, y a partir de ahí todo
+   lo fijo se repinta tarde y a destiempo. Se ve igual; se mueve bien. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(1100px 700px at 78% -10%, var(--papel-halo), transparent 62%),
+    radial-gradient(900px 600px at 8% 108%, var(--papel-halo), transparent 58%);
+}
+
 /* Los enlaces son casi siempre teléfonos: van en el teal de timbre, no en el
    azul del navegador, que es de otro mundo. */
 a { color: var(--timbre); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--timbre) 35%, transparent); }
 
 body {
   font-family: var(--fuente);
-  /* Dos halos muy suaves sobre el papel: dan la profundidad que en la web hace
-     la foto de fondo, sin cargar una imagen que en la montaña no bajaría. */
-  background:
-    radial-gradient(1100px 700px at 78% -10%, var(--papel-halo), transparent 62%),
-    radial-gradient(900px 600px at 8% 108%, var(--papel-halo), transparent 58%),
-    var(--papel);
-  background-attachment: fixed;
+  /* El papel lo pone `html`. Aquí no va fondo: los halos viven en `body::before`
+     —ver abajo— y no en un `background-attachment: fixed`. */
   color: var(--tinta);
   font-size: 15px;
   line-height: 1.5;
@@ -490,7 +508,11 @@ button.mas span { font-size: 18px; font-weight: 700; line-height: 1; margin-top:
 /* Hoja que sube desde abajo: en un teléfono el pulgar llega al borde inferior,
    no al centro de la pantalla. */
 .modal {
-  position: fixed; inset: 0; z-index: 40;
+  position: fixed; inset: 0;
+  /* Por encima de la barra de pestañas (70). Estaba en 40, y la barra se
+     pintaba sobre la hoja tapándole los últimos 62 px: justo donde vive el
+     botón que cierra la acción. Una reserva no se podía confirmar. */
+  z-index: 80;
   background: var(--velo);
   backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
   display: flex; align-items: flex-end; justify-content: center;
@@ -541,7 +563,9 @@ button.mas span { font-size: 18px; font-weight: 700; line-height: 1; margin-top:
   min-height: 34px; width: 34px; padding: 0; font-size: 20px; line-height: 1;
   border-radius: 50%; flex-shrink: 0;
 }
-.modal-cuerpo { padding: var(--e4); overflow-y: auto; }
+/* `overscroll-behavior: contain`: al llegar al final de la hoja, el gesto se
+   acaba ahí y no continúa desplazando la página de detrás. */
+.modal-cuerpo { padding: var(--e4); overflow-y: auto; overscroll-behavior: contain; }
 
 /* Opción de cabaña dentro de la ventana: toda la fila es tocable. */
 .opcion-cabana {
@@ -1547,6 +1571,11 @@ nav.tabs button[aria-selected="true"] svg { opacity: 0; transform: translateY(-1
 @keyframes bubbleLaunch { 0% { transform: none; opacity: 1 } 100% { transform: translateY(-70px) scale(.35); opacity: 0 } }
 @keyframes railIn       { 0% { transform: scale(.08); opacity: .85 } 100% { transform: scale(1); opacity: 1 } }
 @keyframes velolIn      { from { opacity: 0 } to { opacity: 1 } }
+
+/* Con una ventana abierta la barra se retira. No es solo que estorbe: mientras
+   rellenas una reserva no hay ningún viaje que hacer a otra pestaña, y esos
+   62 px son los que le faltaban a la hoja para enseñar su último botón. */
+body.modal-abierto nav.tabs { display: none; }
 
 /* Sitio para la barra Y para la burbuja, que sobresale por encima. */
 body { padding-bottom: calc(var(--barra-alto) + var(--burbuja-sube) + env(safe-area-inset-bottom, 0px) + 8px); }

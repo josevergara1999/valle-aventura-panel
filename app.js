@@ -1522,6 +1522,10 @@ function abrirModal(titulo, sub, html) {
   modal.classList.remove("cerrando");
   modal.hidden = false;
   document.body.style.overflow = "hidden";
+  /* La barra de abajo se retira mientras hay hoja. Se pintaba encima de ella y
+     le comia los ultimos 62 px, que es donde esta el boton que cierra la
+     accion: no habia forma de confirmar una reserva desde el telefono. */
+  document.body.classList.add("modal-abierto");
 }
 
 /* La hoja SALE por donde entro. Antes subia desde abajo al abrir y desaparecia
@@ -1543,6 +1547,7 @@ function cerrarModal() {
     modal.hidden = true;
     modal.classList.remove("cerrando");
     document.body.style.overflow = "";
+    document.body.classList.remove("modal-abierto");
   };
   modal.addEventListener("animationend", ocultar, { once: true });
   cerrandoEn = setTimeout(ocultar, 320);
