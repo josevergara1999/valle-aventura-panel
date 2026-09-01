@@ -7,7 +7,7 @@
    —caché primero— el teléfono seguiría abriendo la versión vieja después de
    cada despliegue, que es exactamente el problema que ya apareció en Inmersia. */
 
-const CACHE = "valle-panel-v31";
+const CACHE = "valle-panel-v33";
 const SHELL = [
   "./index.html", "./tokens.css", "./styles.css", "./app.js",
   "./luces.js", "./config.js", "./manifest.webmanifest",
@@ -102,8 +102,13 @@ self.addEventListener("push", (e) => {
     badge: "./icono-192.png",
     /* Agrupar por destino: tres pedidos seguidos de la misma cabaña actualizan
        un aviso en vez de apilar tres. Los urgentes NO se agrupan — cada avería
-       merece su propia línea. */
-    tag: urgente ? undefined : (d.destino || "valle"),
+       merece su propia línea.
+       Las TAREAS tampoco. Agruparlas por destino haría que el recordatorio de
+       las 9:30 borrara de la pantalla el de las 9:00 sin haberlo leído, y son
+       dos cosas distintas que hay que hacer, no dos versiones de la misma. */
+    tag: urgente ? undefined
+       : d.destino === "tareas" ? "tarea-" + d.id
+       : (d.destino || "valle"),
     renotify: urgente,
     /* `requireInteraction` mantiene el aviso en pantalla hasta que se toca.
        Solo para lo urgente: si se aplicara a todo, la pantalla de bloqueo

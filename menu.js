@@ -36,7 +36,7 @@
       'background:#143D4A;padding-bottom:env(safe-area-inset-bottom,0px)';
     [['calendario','Agenda'],['huespedes','Gente'],['aseos','Aseos'],
      ['cotizaciones','Cotiza'],['luces','Luces'],['finanzas','Plata'],
-     ['tarifas','Precios'],['avisos','Avisos']].forEach(function (par) {
+     ['tarifas','Precios'],['tareas','Tareas'],['avisos','Avisos']].forEach(function (par) {
       const b = document.createElement('button');
       b.type = 'button';
       b.textContent = par[1];
@@ -65,6 +65,8 @@
     { v: 'finanzas', t: 'Finanzas', g: 'Dinero',  i: 'billete' },
     { v: 'tarifas',  t: 'Precios',  g: 'Dinero',  i: 'etiqueta' },
     { sep: true },
+    { v: 'tareas',   t: 'Tareas',   g: 'Casa',    i: 'tareas' },
+    { sep: true },
     { v: 'avisos',   t: 'Avisos',   g: 'Ajustes', i: 'campana' },
     { sep: true },
     { v: 'atlas',    t: 'Atlas',    g: 'Atlas',   i: 'chispa' },
@@ -85,6 +87,8 @@
     etiqueta:   '<path d="M20.5 13.3 13.3 20.5a2 2 0 0 1-2.8 0l-7-7A2 2 0 0 1 3 12V4.5A1.5 1.5 0 0 1 4.5 3H12a2 2 0 0 1 1.4.6l7.1 7.1a2 2 0 0 1 0 2.6Z"/><circle cx="7.5" cy="7.5" r="1.3"/>',
     chispa:     '<path d="M12 2.5 14 9l6.5 2-6.5 2-2 6.5-2-6.5L3.5 11 10 9Z"/><path d="M18.5 3v3M20 4.5h-3"/>',
     campana:    '<path d="M18 8.5a6 6 0 1 0-12 0c0 6-2.5 7.5-2.5 7.5h17S18 14.5 18 8.5"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/>',
+    /* `list-checks` de Lucide, tal cual del repo: no se redibuja. */
+    tareas:     '<path d="M13 5h8"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/>',
   };
   const svg = (n) =>
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +

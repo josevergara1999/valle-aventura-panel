@@ -14,12 +14,12 @@
      Al cambiar el número cambia la dirección, y una dirección nueva no está en
      ninguna caché. Se sube junto con `LZ_VER` de `luces.js`, que lo enseña en
      una esquina del mapa para poder comprobarlo de un vistazo. -->
-<link rel="stylesheet" href="tokens.css?v=32">
-<link rel="stylesheet" href="styles.css?v=32">
+<link rel="stylesheet" href="tokens.css?v=33">
+<link rel="stylesheet" href="styles.css?v=33">
 <!-- El pallet va en su propio archivo por tamaño, no por color: consume
      los mismos tokens que el resto, así que la paleta se sigue cambiando
      desde tokens.css y nada más. -->
-<link rel="stylesheet" href="pallet.css?v=32">
+<link rel="stylesheet" href="pallet.css?v=33">
 </head>
 <body>
 <!--
@@ -205,6 +205,29 @@ finish review, the verdict, and DESIGN.md
       <h2 class="titulo-seccion">Aseos · próximos 30 días</h2>
       <div class="tarjeta"><div id="tl-aseos"></div></div>
       <div id="lista-aseos"></div>
+    </section>
+
+    <!-- TAREAS -->
+    <!-- Lo que nadie deduce de una reserva: comprar pellet, revisar la caldera.
+         Una sola tarjeta: el filtro va arriba porque manda sobre las dos listas
+         que tiene debajo, y las hechas de la semana se quedan a la vista para
+         poder desmarcar lo que se dio por hecho por error. -->
+    <section id="vista-tareas" hidden>
+      <h2 class="titulo-seccion">Tareas</h2>
+      <div class="tarjeta">
+        <div class="ta-cabecera">
+          <select id="ta-filtro" aria-label="Filtrar por cabaña">
+            <option value="todas">Todas</option>
+          </select>
+          <button type="button" id="btn-nueva-tarea">Nueva tarea</button>
+        </div>
+        <div id="ta-aviso"></div>
+        <div id="ta-pendientes"></div>
+        <div id="ta-bloque-hechas" hidden>
+          <h3 class="ta-hechas-titulo">Hechas · últimos 7 días</h3>
+          <div id="ta-hechas"></div>
+        </div>
+      </div>
     </section>
 
     <!-- FINANZAS -->
@@ -395,13 +418,13 @@ finish review, the verdict, and DESIGN.md
   </nav>
 </div>
 
-<script src="config.js?v=32"></script>
-<script src="pallet.js?v=32"></script>
+<script src="config.js?v=33"></script>
+<script src="pallet.js?v=33"></script>
 <!-- El mapa del complejo, antes que `app.js` para que `LZ` ya exista cuando
      arranca el panel. Es el diseño de Claude Design portado a JavaScript a
      secas: sus estilos y posiciones van tal cual, solo cambia el motor. -->
-<script src="luces.js?v=32"></script>
-<script src="app.js?v=32"></script>
-<script src="menu.js?v=32"></script>
+<script src="luces.js?v=33"></script>
+<script src="app.js?v=33"></script>
+<script src="menu.js?v=33"></script>
 </body>
 </html>

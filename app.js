@@ -250,6 +250,10 @@ const st = {
   cabanas: [], reglas: null, tarifaBase: null,
   temporadas: [], tramos: [],
   cotizaciones: [],
+  tareas: [],
+  cabanasTareas: [],          // TODAS las activas, la casa incluida: ver cargarTareas()
+  personas: [],               // quienes usan el panel, para asignar una tarea
+  yo: null,                   // la persona de la sesion abierta, o null
   cabanaSel: null,
   vista: "mes",               // "mes" (cuadricula) o "semana" (lista vertical)
   anio: new Date().getFullYear(),
@@ -297,6 +301,24 @@ async function cargarBase() {
   st.tarifaBase = tarifas[0];
   st.tarifaHoy  = hoy;
   st.cabanaSel  = st.cabanaSel || TODAS;
+
+  await cargarPersonas();
+}
+
+/* Quienes usan el panel. Va APARTE del `Promise.all` de arriba y envuelto en
+   su propio try: si `personas` todavia no existe en la base —o alguien le
+   cambia los permisos— el panel tiene que seguir abriendo. Sin esto, una tabla
+   que solo hace falta para asignar tareas dejaria a Jose sin calendario, sin
+   pagos y sin aseos, y desde el telefono no hay forma de arreglarlo. */
+async function cargarPersonas() {
+  try {
+    st.personas = await api("personas?select=*&activa=is.true&order=nombre");
+  } catch (e) {
+    console.warn("[personas] no se pudieron cargar:", e.message);
+    st.personas = [];
+  }
+  const correo = (sesion && sesion.user && sesion.user.email || "").toLowerCase();
+  st.yo = st.personas.find((p) => (p.email || "").toLowerCase() === correo) || null;
 }
 
 /* Las columnas se piden explicitas y en un solo sitio: con `select=*` una
@@ -3268,7 +3290,15 @@ function avisar(texto, tipo) {
   if (!c) {
     c = document.createElement("div");
     c.id = "aviso-flotante";
-    c.style.cssText = "position:fixed;left:12px;right:12px;bottom:calc(var(--toque) + 12px);z-index:60";
+    /* 90, por encima de la hoja modal (80). Estaba en 60: la hoja se pinta
+       sobre el aviso y lo tapa justo donde cae, a 58 px del borde de abajo.
+       Medido con `elementFromPoint` en 390x844 — quien recibia ese punto era
+       la fila de botones de la hoja, no el aviso.
+       Eso deja MUDO cualquier fallo al guardar desde una hoja: el boton se
+       reactiva y no aparece nada. Con la senal de la montania eso no es raro,
+       y es el mismo patron que ya costo meses en Finanzas — un camino de error
+       que por fuera no se distingue del caso normal. */
+    c.style.cssText = "position:fixed;left:12px;right:12px;bottom:calc(var(--toque) + 12px);z-index:90";
     document.body.appendChild(c);
   }
   c.innerHTML = `<div class="aviso ${tipo}" style="box-shadow:var(--sombra)">${esc(texto)}</div>`;
@@ -3820,6 +3850,14 @@ async function avisosActivar() {
            misma cuenta— y el mismo aviso sonaria dos veces en el teléfono que
            tenga las dos instaladas. Ver `db/push-por-app.sql`. */
         app: "panel",
+        /* De QUIEN es este telefono. Es lo que permite que el recordatorio de
+           una tarea suene solo en el telefono de quien tiene que hacerla.
+           La clave se OMITE cuando no se sabe, en vez de mandarla nula: si el
+           panel se publica antes de aplicar `db/tareas.sql`, la columna
+           todavia no existe y PostgREST rechazaria la fila entera. Un aparato
+           que no se puede registrar es quedarse sin ningun aviso, no sin uno.
+           Sin la clave, la fila es exactamente la de antes. */
+        ...(st.yo ? { persona_id: st.yo.id } : {}),
         activo: true,
         fallos: 0,
       }),
@@ -4348,8 +4386,392 @@ async function elGuardarAparato(id, campos) {
 /* La barra la dibuja `menu.js`: burbuja que viaja, muesca recortada y riel
    lateral. Aqui solo queda CAMBIAR DE PANTALLA, expuesto como una funcion para
    que la barra —o cualquier otra cosa— pueda pedirlo sin saber como se pinta. */
-const VISTAS = ["calendario", "huespedes", "luces", "aseos", "finanzas",
+const VISTAS = ["calendario", "huespedes", "luces", "aseos", "tareas", "finanzas",
                 "cotizaciones", "tarifas", "avisos", "atlas"];
+
+/* ============================================================================
+   Tareas — datos
+   ============================================================================
+   La lista de pendientes de las cabanas. Aqui solo esta el acceso a la base;
+   la pantalla se pinta aparte, contra el diseno.
+
+   Tres cosas que decide la base y NO este archivo, por la misma razon de
+   siempre —el panel lo usan tres personas desde aparatos distintos, y lo que
+   decide el navegador solo es cierto en ese navegador—:
+
+     - CUANDO suena el recordatorio. Se calcula en `tg_tarea_recordatorio` a
+       partir de `fecha` y `hora`. Aqui se mandan los dos campos y nada mas.
+     - QUIEN la marco hecha y a que hora: lo pone un disparador con la sesion
+       que hizo el PATCH. Por eso `marcarTarea` envia solo `hecha`.
+     - A QUE TELEFONO suena: el de `responsable_id`. Ver `db/tareas.sql`.
+   ============================================================================ */
+
+/* Las pendientes SIEMPRE, y las hechas solo de la ultima semana. Una lista de
+   tareas que arrastra todo lo completado desde el primer dia deja de servir
+   para lo unico que sirve —ver que falta— y encima crece sin tope. Siete dias
+   alcanzan para desmarcar algo que se dio por hecho por error. */
+async function cargarTareas() {
+  const desde = sumarDias(hoyISO(), -7);
+  const [tareas, cabanas] = await Promise.all([
+    api("tareas?select=*" +
+        `&or=(hecha.is.false,hecha_at.gte.${desde})` +
+        "&order=hecha.asc,fecha.asc.nullslast,hora.asc.nullsfirst,orden.asc,creado_at.asc"),
+    /* TODAS las cabanas activas, incluida la casa. `st.cabanas` no sirve aqui:
+       filtra por `arrienda` porque existe para vender noches, y "cambiar el
+       filtro de la casa" es una tarea tan real como cualquier otra. */
+    api("cabanas?select=id,nombre,numero&activa=eq.true&order=orden"),
+  ]);
+  st.tareas = tareas;
+  st.cabanasTareas = cabanas;
+  return tareas;
+}
+
+/* `fecha` y `hora` van vacias o no van: una cadena vacia en un campo `date` es
+   un 400, y `hora` sin `fecha` la rechaza la propia tabla. */
+function limpiarTarea(d) {
+  const t = {
+    texto: (d.texto || "").trim(),
+    detalle: (d.detalle || "").trim() || null,
+    cabana_id: d.cabana_id || null,
+    responsable_id: d.responsable_id || null,
+    fecha: d.fecha || null,
+    hora: d.fecha ? (d.hora || null) : null,
+    prioridad: d.prioridad || "normal",
+  };
+  if (!t.texto) throw new Error("La tarea necesita un texto");
+  return t;
+}
+
+async function crearTarea(d) {
+  const fila = await api("tareas", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify(limpiarTarea(d)),
+  });
+  return fila[0];
+}
+
+async function guardarTarea(id, d) {
+  const fila = await api(`tareas?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify(limpiarTarea(d)),
+  });
+  return fila[0];
+}
+
+/* Solo `hecha`. La fecha y el autor los pone el disparador `tarea_hecha`: son
+   el registro de lo que paso, no un dato que elija el telefono. */
+async function marcarTarea(id, hecha) {
+  const fila = await api(`tareas?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ hecha: !!hecha }),
+  });
+  return fila[0];
+}
+
+async function borrarTarea(id) {
+  await api(`tareas?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+/* Como se lee una tarea en pantalla: sin fecha no hay recordatorio y hay que
+   decirlo, no dejarlo en blanco. Un hueco vacio no se distingue de un fallo. */
+function cuandoTarea(t) {
+  if (!t.fecha) return "Sin fecha";
+  const dia = fechaCorta(t.fecha);
+  return t.hora ? `${dia} a las ${t.hora.slice(0, 5)}` : dia;
+}
+
+function nombrePersona(id) {
+  const p = st.personas.find((x) => x.id === id);
+  return p ? p.nombre : null;
+}
+
+/* ============================================================================
+   Tareas — pantalla
+   ============================================================================
+   Pendientes arriba, las hechas de la semana debajo. El filtro por cabana es
+   un select y no un segmentado: son cinco opciones con nombres largos, y en
+   los ~320 px utiles de una tarjeta en un iPhone un segmentado de cinco queda
+   en silabas cortadas.
+
+   El estado ATRASADA no estrena color —el libro tiene un solo acento—: lo
+   dicen el filete de tinta en el canto, el peso del texto y la palabra.
+
+   Marcar hecha tiene tres tiempos: el acuse (el check se dibuja y el trazo
+   tacha el texto, sin que la fila cambie de alto), el pliegue (la fila se
+   cierra y las de abajo suben con ella), y la llegada (la misma tarea aparece
+   en la otra lista con la huella del sello desvaneciendose). El PATCH corre en
+   paralelo; si falla, se recarga la verdad de la base y se avisa.
+   ============================================================================ */
+const ta = {
+  filtro: "todas",
+  cargado: false,      // la primera visita dice "Cargando"; despues, lo que hay
+  entrando: null,      // id que acaba de llegar a su lista: entra con fundido
+  animando: new Set(), // filas en pleno acuse: el segundo toque no se apila
+};
+
+const cabanaTarea = (id) =>
+  st.cabanasTareas.find((c) => c.id === id)?.nombre || nombreCabana(id);
+const taReducido = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+const taAtrasada = (t) => !t.hecha && !!t.fecha && t.fecha < hoyISO();
+
+function taFila(t) {
+  const atras = taAtrasada(t);
+  const cls = ["ta-fila"];
+  if (t.hecha) cls.push("hecha");
+  if (atras) cls.push("atrasada");
+  if (ta.entrando === t.id) cls.push("entrando");
+
+  /* Los cuatro estados se leen en la linea de abajo: la cita lleva la hora en
+     negrita, el dia a secas va normal, "Sin fecha" lo dice con la palabra, y
+     la atrasada abre con ATRASADA ademas del filete del canto. */
+  const partes = [];
+  if (atras) partes.push('<b class="ta-tarde">Atrasada</b>');
+  partes.push(t.hora ? `<b>${esc(cuandoTarea(t))}</b>` : esc(cuandoTarea(t)));
+  if (t.cabana_id) partes.push(esc(cabanaTarea(t.cabana_id)));
+  const quien = nombrePersona(t.responsable_id);
+  if (quien) partes.push(esc(quien));
+
+  return `
+    <div class="${cls.join(" ")}" data-ta-id="${t.id}">
+      <button type="button" class="ta-check" data-ta-marcar="${t.id}"
+              aria-label="${t.hecha ? "Desmarcar" : "Marcar hecha"}">
+        <span class="ta-caja"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
+          aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+      </button>
+      <button type="button" class="ta-cuerpo" data-ta-editar="${t.id}">
+        <span class="ta-texto">${esc(t.texto)}</span>${
+          t.prioridad === "alta" && !t.hecha ? '<span class="ta-alta">Alta</span>' : ""}
+        <span class="ta-meta">${partes.join(" &middot; ")}</span>
+      </button>
+    </div>`;
+}
+
+function pintarFiltroTareas() {
+  const sel = $("#ta-filtro");
+  const valor = st.cabanasTareas.some((c) => c.id === ta.filtro) ? ta.filtro : "todas";
+  sel.innerHTML = '<option value="todas">Todas</option>' +
+    st.cabanasTareas.map((c) => `<option value="${c.id}">${esc(c.nombre)}</option>`).join("");
+  sel.value = valor;
+  ta.filtro = valor;
+}
+
+function pintarListaTareas() {
+  const mias = (t) => ta.filtro === "todas" || t.cabana_id === ta.filtro;
+  const pend = st.tareas.filter((t) => !t.hecha && mias(t));
+  /* Las hechas con la mas reciente arriba: lo recien marcado es lo que se mira
+     para comprobar que quedo, o para desmarcarlo. */
+  const hechas = st.tareas.filter((t) => t.hecha && mias(t))
+    .sort((a, b) => (b.hecha_at || "").localeCompare(a.hecha_at || ""));
+
+  /* Tres vacios y cada uno dice el suyo: nada anotado, nada de ESTA cabana, o
+     todo hecho. Un bloque en blanco no se distingue de uno roto. */
+  const caja = $("#ta-pendientes");
+  if (pend.length)        caja.innerHTML = pend.map(taFila).join("");
+  else if (hechas.length) caja.innerHTML = '<p class="lista-vacia">Todo hecho.</p>';
+  else if (ta.filtro !== "todas" && st.tareas.length)
+    caja.innerHTML = `<p class="lista-vacia">Nada anotado para ${esc(cabanaTarea(ta.filtro))}.</p>`;
+  else caja.innerHTML = '<p class="lista-vacia">Sin tareas. Anota la primera.</p>';
+
+  $("#ta-bloque-hechas").hidden = !hechas.length;
+  if (hechas.length) $("#ta-hechas").innerHTML = hechas.map(taFila).join("");
+  ta.entrando = null;
+}
+
+async function pintarTareas() {
+  if (ta.cargado) pintarListaTareas();
+  else $("#ta-pendientes").innerHTML = '<p class="lista-vacia">Cargando...</p>';
+  try {
+    await cargarTareas();
+    ta.cargado = true;
+    pintarFiltroTareas();
+    pintarListaTareas();
+  } catch (err) {
+    avisarEn("#ta-aviso", err.message, "error");
+    if (!ta.cargado) $("#ta-pendientes").innerHTML =
+      '<p class="lista-vacia">No se pudo cargar. Revisa la señal.</p>';
+  }
+}
+
+function taMarcar(fila, id) {
+  if (ta.animando.has(id)) return;
+  const t = st.tareas.find((x) => String(x.id) === String(id));
+  if (!t || !fila) return;
+  const hecha = !t.hecha;
+  ta.animando.add(id);
+
+  let fallo = null;
+  const patch = marcarTarea(t.id, hecha)
+    .then((r) => { if (r) { t.hecha_at = r.hecha_at; t.hecha_por = r.hecha_por; } })
+    .catch((err) => { fallo = err; });
+
+  /* El acuse, al instante y sin tocar el alto: el check se dibuja (o se
+     borra, al deshacer) y la casilla late con transform. */
+  fila.classList.toggle("hecha", hecha);
+  fila.classList.add("marcando");
+
+  const reducido = taReducido();
+  const plegar = () => new Promise((fin) => {
+    if (reducido || !fila.isConnected) return fin();
+    fila.style.height = fila.offsetHeight + "px";
+    void fila.offsetHeight;
+    fila.classList.add("saliendo");
+    setTimeout(fin, 280);
+  });
+
+  /* Primero se VE el acuse, despues la fila se va. Con movimiento reducido no
+     hay pliegue: un fundido corto y el repintado. */
+  setTimeout(async () => {
+    await plegar();
+    await patch;
+    ta.animando.delete(id);
+    if (fallo) {
+      avisar(fallo.message, "error");
+      try { await cargarTareas(); } catch (_) {}
+    } else {
+      t.hecha = hecha;
+      if (hecha) t.hecha_at = t.hecha_at || new Date().toISOString();
+      ta.entrando = t.id;
+    }
+    if (!$("#vista-tareas").hidden) pintarListaTareas();
+  }, reducido ? 200 : 560);
+}
+
+/* Alta y edicion, en la misma hoja modal de todo el panel. `hora` sin `fecha`
+   la rechaza la base: aqui el campo directamente se apaga. */
+function ventanaTarea(id) {
+  const t = id ? st.tareas.find((x) => String(x.id) === String(id)) : null;
+  let prioridad = t?.prioridad || "normal";
+
+  const cabanas = st.cabanasTareas.map((c) =>
+    `<option value="${c.id}"${t?.cabana_id === c.id ? " selected" : ""}>${esc(c.nombre)}</option>`).join("");
+  const gente = st.personas.map((p) =>
+    `<option value="${p.id}"${t?.responsable_id === p.id ? " selected" : ""}>${esc(p.nombre)}</option>`).join("");
+
+  abrirModal(t ? "Editar tarea" : "Nueva tarea",
+    t ? `${t.cabana_id ? cabanaTarea(t.cabana_id) + " · " : ""}${cuandoTarea(t)}`
+      : "Con hora, suena en el teléfono", `
+    <div class="campo">
+      <label for="ta-texto">Qué hay que hacer</label>
+      <input type="text" id="ta-texto" placeholder="Revisar la caldera"
+             value="${esc(t?.texto || "")}">
+    </div>
+    <div class="fila">
+      <div class="campo">
+        <label for="ta-cabana">Cabaña</label>
+        <select id="ta-cabana"><option value="">Ninguna</option>${cabanas}</select>
+      </div>
+      <div class="campo">
+        <label for="ta-resp">Responsable</label>
+        <select id="ta-resp"><option value="">A todos</option>${gente}</select>
+      </div>
+    </div>
+    <div class="fila">
+      <div class="campo">
+        <label for="ta-fecha">Fecha</label>
+        <input type="date" id="ta-fecha" value="${t?.fecha || ""}">
+      </div>
+      <div class="campo">
+        <label for="ta-hora">Hora</label>
+        <input type="time" id="ta-hora" value="${t?.hora ? t.hora.slice(0, 5) : ""}"${t?.fecha ? "" : " disabled"}>
+      </div>
+    </div>
+    <p class="nota-campo" id="ta-nota-hora"${t?.fecha ? " hidden" : ""}>La hora necesita una fecha.</p>
+    <label>Prioridad</label>
+    <div class="segmentado" id="ta-prio">
+      ${["baja", "normal", "alta"].map((p) =>
+        `<button type="button" data-prio="${p}" aria-selected="${String(p === prioridad)}">
+           ${p[0].toUpperCase() + p.slice(1)}</button>`).join("")}
+    </div>
+    <div class="fila" style="margin-top:var(--e4)">
+      <button type="button" class="secundario" data-cerrar>Cancelar</button>
+      <button type="button" id="btn-ta-guardar">Guardar</button>
+    </div>
+    ${t ? `<button type="button" class="peligro ancho" id="btn-ta-borrar"
+             style="margin-top:var(--e2)">Eliminar</button>` : ""}`);
+
+  const fecha = $("#ta-fecha"), hora = $("#ta-hora");
+  const ajustarHora = () => {
+    const hay = !!fecha.value;
+    hora.disabled = !hay;
+    if (!hay) hora.value = "";
+    $("#ta-nota-hora").hidden = hay;
+  };
+  fecha.addEventListener("change", ajustarHora);
+  fecha.addEventListener("input", ajustarHora);
+
+  $("#ta-prio").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-prio]");
+    if (!b) return;
+    prioridad = b.dataset.prio;
+    $$("#ta-prio button").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
+  });
+
+  $("#btn-ta-guardar").addEventListener("click", async () => {
+    const d = {
+      texto: $("#ta-texto").value,
+      detalle: t?.detalle || "",   // se conserva: la hoja no lo edita
+      cabana_id: $("#ta-cabana").value || null,
+      responsable_id: $("#ta-resp").value || null,
+      fecha: fecha.value || null,
+      hora: (fecha.value && hora.value) ? hora.value : null,
+      prioridad,
+    };
+    if (!d.texto.trim()) { avisar("Falta qué hay que hacer.", "error"); return; }
+    const btn = $("#btn-ta-guardar");
+    btn.disabled = true; btn.textContent = "Guardando...";
+    try {
+      const fila = t ? await guardarTarea(t.id, d) : await crearTarea(d);
+      await cargarTareas();
+      ta.cargado = true;
+      ta.entrando = fila?.id ?? null;
+      pintarFiltroTareas();
+      pintarListaTareas();
+      cerrarModal();
+    } catch (err) {
+      avisar(err.message, "error");
+      btn.disabled = false; btn.textContent = "Guardar";
+    }
+  });
+
+  if (t) $("#btn-ta-borrar").addEventListener("click", () => confirmarBorrarTarea(t));
+}
+
+function confirmarBorrarTarea(t) {
+  abrirModal("¿Eliminar la tarea?", t.texto, `
+    <div class="aviso error">Se borra del todo. No se puede deshacer.</div>
+    <div class="fila">
+      <button type="button" class="secundario" id="ta-borrar-no">No, volver</button>
+      <button type="button" class="peligro" id="ta-borrar-si">Sí, eliminar</button>
+    </div>`);
+  $("#ta-borrar-no").addEventListener("click", () => ventanaTarea(t.id));
+  $("#ta-borrar-si").addEventListener("click", async () => {
+    const btn = $("#ta-borrar-si");
+    btn.disabled = true;
+    try {
+      await borrarTarea(t.id);
+      st.tareas = st.tareas.filter((x) => x.id !== t.id);
+      pintarListaTareas();
+      cerrarModal();
+    } catch (err) { avisar(err.message, "error"); btn.disabled = false; }
+  });
+}
+
+/* Un manejador por contenedor, como en el resto del panel. */
+$("#vista-tareas").addEventListener("click", (e) => {
+  const marcar = e.target.closest("[data-ta-marcar]");
+  if (marcar) { taMarcar(marcar.closest(".ta-fila"), marcar.dataset.taMarcar); return; }
+  const editar = e.target.closest("[data-ta-editar]");
+  if (editar) ventanaTarea(editar.dataset.taEditar);
+});
+$("#ta-filtro").addEventListener("change", (e) => {
+  ta.filtro = e.target.value;
+  pintarListaTareas();
+});
+$("#btn-nueva-tarea").addEventListener("click", () => ventanaTarea(null));
 
 function irA(vista) {
   if (!VISTAS.includes(vista)) return;
@@ -4367,6 +4789,7 @@ function irA(vista) {
   if (vista === "atlas")        pintarAtlas();
   if (vista === "tarifas")      pintarTarifas();
   if (vista === "aseos")        pintarAseos();
+  if (vista === "tareas")       pintarTareas();
   if (vista === "finanzas")     pintarFinanzas();
   if (vista === "cotizaciones") {
     cargarCotizaciones().then(pintarCotizaciones)

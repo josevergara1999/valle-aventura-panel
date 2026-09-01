@@ -197,11 +197,28 @@ const appDelAviso = (aviso: any): string => (aviso?.destino === 'atlas' ? 'atlas
  * panel instalado. Esa pantalla responde dos preguntas sobre Atlas y nada más;
  * enseñarle ahí "Piden pellet · Cabaña Nevados" y que al tocarlo no lleve a
  * ninguna parte es peor que no enseñarlo. */
-function destinatarios(disps: any[], app: string): any[] {
+function destinatarios(disps: any[], app: string, persona: string | null): any[] {
   const propios = disps.filter((d) => (d.app ?? 'panel') === app);
-  if (propios.length) return propios;
-  if (app === 'panel') return [];
-  return disps.filter((d) => (d.app ?? 'panel') === 'panel');
+  const base = propios.length
+    ? propios
+    : (app === 'panel' ? [] : disps.filter((d) => (d.app ?? 'panel') === 'panel'));
+
+  /* Sin dueño, a todos: es como se comporta cada aviso escrito hasta hoy y
+   * como se siguen comportando todos menos los recordatorios de tarea. */
+  if (!persona) return base;
+
+  /* Con dueño, solo a sus teléfonos. Un recordatorio de tarea es de UNA
+   * persona: "revisar la caldera a las 9" no tiene por qué sonarle a los
+   * otros dos, y hacer sonar a alguien por lo que no es suyo es el camino
+   * corto a que silencie la categoría entera.
+   *
+   * EL RESPALDO SÍ IMPORTA. Si esa persona no tiene ningún teléfono suscrito
+   * —todavía no instaló el panel, lo reinstaló y perdió la suscripción— el
+   * aviso sale a todos igualmente. Un recordatorio que no le llega a nadie es
+   * peor que uno que además le llega a quien no le tocaba, y el cuerpo del
+   * aviso ya dice de qué tarea habla. */
+  const suyos = base.filter((d) => d.persona_id === persona);
+  return suyos.length ? suyos : base;
 }
 
 // ── Acceso a la base ───────────────────────────────────────────────────────
@@ -248,7 +265,7 @@ Deno.serve(async (req) => {
        despues, y ese ida y vuelta por cada pasada del cron —una por minuto— no
        compra nada. Se queda en la cola y `avisos_caducar()` lo retira a las 6h,
        que es lo mismo que pasaba cuando no habia ningun dispositivo. */
-    const aQuien = destinatarios(disps, appDelAviso(aviso));
+    const aQuien = destinatarios(disps, appDelAviso(aviso), aviso.persona_id ?? null);
     if (!aQuien.length) { sinDestino++; continue; }
 
     /* RESERVAR EL AVISO ANTES DE MANDARLO
