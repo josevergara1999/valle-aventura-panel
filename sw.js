@@ -7,7 +7,7 @@
    —caché primero— el teléfono seguiría abriendo la versión vieja después de
    cada despliegue, que es exactamente el problema que ya apareció en Inmersia. */
 
-const CACHE = "valle-panel-v33";
+const CACHE = "valle-panel-v34";
 const SHELL = [
   "./index.html", "./tokens.css", "./styles.css", "./app.js",
   "./luces.js", "./config.js", "./manifest.webmanifest",

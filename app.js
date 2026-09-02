@@ -137,6 +137,15 @@ async function urlComprobante(ruta, segundos = 3600) {
 const $  = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 const clp = (n) => "$" + Math.round(n).toLocaleString("es-CL");
+
+/* Las iniciales del huesped, para el circulo de las tarjetas. Dos letras: con
+   una sola, media lista se llama igual. Sin nombre devuelve un guion, que se
+   lee como "todavia no lo sabemos" y no como un circulo roto. */
+const iniciales = (nombre) => {
+  const p = String(nombre || "").trim().split(/\s+/).filter(Boolean);
+  if (!p.length) return "&mdash;";
+  return esc((p[0][0] + (p[1] ? p[1][0] : "")).toUpperCase());
+};
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
@@ -398,7 +407,6 @@ function pintarHoy() {
   const llegan   = st.hoy.filter((b) => b.desde === hoy);
   const sevan    = st.hoy.filter((b) => b.hasta === hoy);
   const sequedan = st.hoy.filter((b) => b.desde < hoy && b.hasta > hoy);
-  const ocupadas = new Set(st.hoy.filter((b) => b.hasta > hoy).map((b) => b.cabana_id)).size;
 
   if (!llegan.length && !sevan.length && !sequedan.length) {
     $("#movimiento-hoy").innerHTML =
@@ -407,45 +415,85 @@ function pintarHoy() {
     return;
   }
 
-  /* Cada grupo es su propia caja, con su color en el canto. Quien llega y quien
-     se va son dos tareas distintas del dia: en una sola lista corrida hay que
-     releer el encabezado para saber en cual se esta. */
-  const grupo = (clave, titulo, lista, hora) => lista.length ? `
-    <div class="tarjeta grupo-hoy ${clave}">
-    <p class="titulo-ocupadas">${titulo}${hora ? ` &middot; ${hhmm(hora)}` : ""}</p>
-    ${lista.map((b) => {
-      const canal = b.canal || (b.origen === "airbnb" ? "airbnb" : null);
-      const quien = b.tipo === "bloqueo"
-        ? '<span style="color:var(--tx-2)">Bloqueo</span>'
-        : esc(b.nombre || "Reserva");
-      const gente = textoHuespedes(b) || null;
-      /* Aqui NO se abre ventana: la fila se despliega hacia abajo. Es la
-         seccion que se consulta de pasada, muchas veces al dia, y una ventana
-         que hay que cerrar para seguir mirando estorba mas de lo que muestra. */
-      const abierta = st.hoyAbierta === b.id;
-      return `<button type="button" class="fila-reserva${abierta ? " abierta" : ""}"
-                      data-desplegar="${b.id}" aria-expanded="${abierta}"
-                      data-pagos="${b.tipo === "bloqueo" ? 0 : mitadesPagadas(b)}">
-        <span>
-          ${insignia(canal)}<b>${quien}</b>
-          <br><span style="font-size:12.5px">${esc(nombreCabana(b.cabana_id))}</span>
-          ${gente ? `<br><span style="color:var(--tx-3);font-size:12px">${gente}</span>` : ""}
-          ${b.nota ? `<br><span style="color:var(--tx-3);font-size:12px">${esc(b.nota)}</span>` : ""}
-        </span>
-        <span class="flecha">&rsaquo;</span>
-      </button>
-      ${abierta ? `<div class="detalle-hoy">
-        ${detalleReserva(b, `precio-hoy-${b.id}`, { sinCabana: true, sinNota: true })}
-        ${b.origen === "airbnb" ? "" :
-          `<button type="button" class="editar-hoy" data-editar="${b.id}">Editar</button>`}
-      </div>` : ""}`;
-    }).join("")}</div>` : "";
+  /* La etiqueta corta de cada persona: distinta segun el grupo, pero siempre
+     con un dato que ya esta en la mano — nunca uno que haya que inventar.
+     "Llegan" la saca del abono (medio pagado o completo); "Alojados" cuenta la
+     noche contra el total de la estadia; "Salen" avisa si esa misma cabaña
+     recibe hoy a otra reserva, que es cuando el aseo no puede esperar. */
+  const etiquetaHoy = (b, clave) => {
+    if (b.tipo === "bloqueo") return "";
+    if (clave === "llegan") {
+      const m = mitadesPagadas(b);
+      return m >= 2 ? "Pagada" : m === 1 ? "Anticipo" : "";
+    }
+    if (clave === "sequedan") {
+      const total  = nochesEntre(b.desde, b.hasta);
+      const actual = nochesEntre(b.desde, hoy) + 1;
+      return `Noche ${actual}/${total}`;
+    }
+    return llegan.some((x) => x.cabana_id === b.cabana_id) ? "Aseo hoy" : "";
+  };
 
-  $("#movimiento-hoy").innerHTML =
-    grupo("llegan",   "Llegan hoy", llegan,   st.reglas?.check_in) +
-    grupo("sevan",    "Se van hoy", sevan,    st.reglas?.check_out) +
-    grupo("sequedan", "Se quedan",  sequedan) +
-    `<p class="pie-hoy">${ocupadas} de ${st.cabanas.length} cabañas ocupadas esta noche</p>`;
+  /* Un solo rotulo por grupo — "Llegan", "Alojados", "Salen" — con su punto de
+     color, y debajo cada persona en su propia fila desplegable. Sigue siendo
+     `data-desplegar` la que abre y cierra, igual que antes: solo cambia donde
+     vive la fila, no como se abre. */
+  const grupo = (clave, titulo, lista, hora) => lista.length ? `
+    <div class="grupo-hoy ${clave}">
+      <p class="titulo-ocupadas">${titulo}</p>
+      <div class="hoy-personas">
+        ${lista.map((b) => {
+          const canal = b.canal || (b.origen === "airbnb" ? "airbnb" : null);
+          const quien = b.tipo === "bloqueo"
+            ? '<span style="color:var(--tx-2)">Bloqueo</span>'
+            : esc(b.nombre || "Reserva");
+          const gente = textoHuespedes(b);
+          const meta = clave === "sequedan"
+            ? [`Sale el ${fechaCorta(b.hasta)}`, gente].filter(Boolean).join(" &middot; ")
+            : [hora ? hhmm(hora) : null, gente].filter(Boolean).join(" &middot; ");
+          const tag = etiquetaHoy(b, clave);
+          /* Aqui NO se abre ventana: la fila se despliega hacia abajo. Es la
+             seccion que se consulta de pasada, muchas veces al dia, y una
+             ventana que hay que cerrar para seguir mirando estorba mas de lo
+             que muestra. */
+          const abierta = st.hoyAbierta === b.id;
+          return `<button type="button" class="fila-reserva hoy-persona${abierta ? " abierta" : ""}"
+                          data-desplegar="${b.id}" aria-expanded="${abierta}"
+                          data-pagos="${b.tipo === "bloqueo" ? 0 : mitadesPagadas(b)}">
+            <span class="hoy-persona-txt">
+              <span class="hoy-persona-nombre">${insignia(canal)}<b>${quien}</b>
+                <span class="hoy-persona-cab">&middot; ${esc(nombreCabana(b.cabana_id))}</span></span>
+              ${meta ? `<span class="hoy-persona-meta">${meta}</span>` : ""}
+            </span>
+            ${tag ? `<span class="hoy-persona-tag">${tag}</span>` : ""}
+          </button>
+          ${abierta ? `<div class="detalle-hoy">
+            ${detalleReserva(b, `precio-hoy-${b.id}`, { sinCabana: true, sinNota: true })}
+            ${b.origen === "airbnb" ? "" :
+              `<button type="button" class="editar-hoy" data-editar="${b.id}">Editar</button>`}
+          </div>` : ""}`;
+        }).join("")}
+      </div>
+    </div>` : "";
+
+  /* Las tres cabañas, siempre en el mismo orden que trae la base — la
+     encendida es la que sigue ocupada esta noche (su salida es mañana o mas
+     adelante, no hoy). */
+  const pildorasNoche = st.cabanas.map((c) => {
+    const ocupada = st.hoy.some((b) => b.cabana_id === c.id && b.hasta > hoy);
+    return `<span class="hoy-pildora${ocupada ? " activa" : ""}">${esc(c.nombre.replace(/^Cabaña /, ""))}</span>`;
+  }).join("");
+
+  $("#movimiento-hoy").innerHTML = `
+    <div class="tarjeta lista">
+      ${grupo("llegan",   "Llegan",   llegan,   st.reglas?.check_in)}
+      ${grupo("sequedan", "Alojados", sequedan)}
+      ${grupo("sevan",    "Salen",    sevan,    st.reglas?.check_out)}
+      <div class="hoy-noche">
+        <span>Esta noche</span>
+        <div class="hoy-pildoras">${pildorasNoche}</div>
+      </div>
+    </div>`;
 
   /* El precio se pide despues de pintar, y solo de la fila abierta. */
   const abierta = st.hoy.find((b) => b.id === st.hoyAbierta);
@@ -578,34 +626,30 @@ function pintarListaAseos() {
     return;
   }
 
-  /* Agrupadas por dia: un dia con dos salidas es una sola ida a limpiar. */
-  const porDia = {};
-  for (const b of salidas) (porDia[b.hasta] ||= []).push(b);
-
   const ci = hhmm(st.reglas?.check_in  || "16:00");
   const co = hhmm(st.reglas?.check_out || "11:00");
 
-  $("#lista-aseos").innerHTML = Object.entries(porDia).map(([dia, lista]) => {
-    const urgentes = lista.filter((b) =>
-      st.bloqueos.some((x) => x.cabana_id === b.cabana_id && x.desde === dia));
-
-    return `<div class="tarjeta aseo-dia${urgentes.length ? " urgente" : ""}">
-      <div class="aseo-cabecera">
-        <b>${fechaLarga(dia)}</b>
+  /* Una placa de 56x56 por linea, con el dia arriba y el dia de la semana
+     abajo — la fecha ya vive ahi, asi que cada salida es su propia tarjeta y
+     no hace falta agruparlas bajo un encabezado que repetiria lo mismo. */
+  $("#lista-aseos").innerHTML = salidas.map((b) => {
+    const entra = st.bloqueos.some((x) => x.cabana_id === b.cabana_id && x.desde === b.hasta);
+    const d = new Date(b.hasta + "T00:00:00");
+    const dow = d.toLocaleDateString("es-CL", { weekday: "short" }).replace(".", "").slice(0, 3);
+    /* Ni un nombre de huésped en toda la sección: quien limpia necesita la
+       cabaña y la hora, y saber quién dormía ahí no cambia nada de su
+       trabajo. Además evita pasear los datos del cliente por una pantalla
+       que abre otra persona. */
+    return `<div class="tarjeta plana aseo-linea${entra ? " urgente" : ""}">
+      <div class="aseo-placa${entra ? " urgente" : ""}">
+        <span class="aseo-placa-dia">${d.getDate()}</span>
+        <span class="aseo-placa-dow">${dow}</span>
       </div>
-      ${lista.map((b) => {
-        const entra = st.bloqueos.some((x) => x.cabana_id === b.cabana_id && x.desde === dia);
-        /* Ni un nombre de huésped en toda la sección: quien limpia necesita la
-           cabaña y la hora, y saber quién dormía ahí no cambia nada de su
-           trabajo. Además evita pasear los datos del cliente por una pantalla
-           que abre otra persona. */
-        return `<div class="aseo-linea${entra ? " aprieta" : ""}">
-          <b>${esc(numeroCabana(b.cabana_id))}</b>
-          <span class="aseo-cab">${esc(nombreCabana(b.cabana_id).replace(/^Cabaña /, ""))}</span>
-          <span class="aseo-mov">Sale a las ${co}${entra ? ` &middot; entra a las ${ci}` : ""}</span>
-          ${entra ? `<p class="aseo-aviso">Hay que limpiarla este mismo día</p>` : ""}
-        </div>`;
-      }).join("")}
+      <div class="fila-txt">
+        <b>${esc(numeroCabana(b.cabana_id))}</b>
+        <span><span class="aseo-cab">${esc(nombreCabana(b.cabana_id).replace(/^Cabaña /, ""))}</span> &middot; Sale a las ${co}${entra ? ` &middot; entra a las ${ci}` : ""}</span>
+      </div>
+      ${entra ? `<p class="aseo-aviso">Hay que limpiarla este mismo día</p>` : ""}
     </div>`;
   }).join("");
 }
@@ -1174,8 +1218,18 @@ function pintarMes() {
       clases.push("multi");
       if (libres === 0) clases.push("ocupado");
       else if (libres < st.cabanas.length) clases.push("parcial");
-      if (libres < st.cabanas.length)
-        interior = `${d}<span class="libres">${libres} libre${libres === 1 ? "" : "s"}</span>`;
+      /* Tres rayas, siempre en el mismo orden de `st.cabanas` (Shangri-la, El
+         Chueco, Nevados): una por cabaña, no un numero agregado — se lee la
+         estadia a lo largo de la semana en vez de solo "cuantas quedan". El
+         dia de HOY ya llega en teal solido por la clase `hoy`; es el CSS el
+         que ahi invierte el color de cada raya, porque una raya teal no se ve
+         sobre un fondo teal. */
+      const rayas = st.cabanas.map((c) => {
+        const b = st.bloqueos.find((x) => x.cabana_id === c.id && f >= x.desde && f < x.hasta);
+        const cl = !b ? "libre" : (b.origen === "airbnb" ? "airbnb" : "ocupada");
+        return `<span class="dia-raya ${cl}"></span>`;
+      }).join("");
+      interior = `<span class="dia-num">${d}</span><span class="dia-rayas">${rayas}</span>`;
       /* El rango se marca con borde, no con fondo: pintarlo taparia justo el
          dato que se esta mirando. */
       if (st.desde && st.hasta && f >= st.desde && f < st.hasta) clases.push("rango-multi");
@@ -2602,8 +2656,18 @@ async function cargarTemporadas() {
     api("rpc/tramos_temporada", { method: "POST",
         body: JSON.stringify({ p_anio: anio }) }),
   ]);
-  st.temporadas = temporadas;
-  st.tramos     = tramos;
+  /* Se guardan SIEMPRE como lista. Si la funcion contestara otra cosa —un
+     objeto de error, un nulo—, `st.tramos || []` no protege: un objeto es
+     verdadero y el `.map()` de mas abajo revienta, y con el se cae la pantalla
+     de Precios entera. Es el mismo fallo que dejo el bloque "Por donde entro"
+     en blanco durante meses. */
+  /* Y solo las que SON temporada. La consulta ya pide `desde_mes=not.is.null`,
+     pero si por lo que sea llegara el valor base —que no tiene dia ni mes— se
+     pintaria como "undefined undefined → undefined undefined". Una fila sin
+     fechas no es una temporada, y aqui se descarta en vez de dibujarla rota. */
+  st.temporadas = (Array.isArray(temporadas) ? temporadas : [])
+    .filter((t) => t && t.desde_mes != null && t.desde_dia != null);
+  st.tramos     = Array.isArray(tramos) ? tramos : [];
 }
 
 /* El anio entero en una barra. El ancho de cada tramo son sus dias reales, no
@@ -3326,6 +3390,17 @@ const HU_ETIQUETA = {
   otro:   "Mensaje",
 };
 
+/* El icono de cada tipo de solicitud, calcado del `.sol-ico` de la lamina
+   #bandeja: llave para la averia, olas para la tinaja, llama para el pellet,
+   globo de mensaje para todo lo demas. Trazo 1.9 sin relleno, como el resto
+   del panel. */
+const HU_ICONO = {
+  falla:  '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+  tinaja: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></svg>',
+  pellet: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>',
+  otro:   '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>',
+};
+
 const HU_FALLA = {
   estufa: "Estufa", califont: "Califont", bano: "Bano", gas: "Gas",
   cocina: "Cocina", lavaplatos: "Lavaplatos", encimera: "Encimera",
@@ -3337,7 +3412,12 @@ const hu = { filtro: "pendientes", solicitudes: [], alojados: [], porLlegar: [],
 /* Cuanto hace que llego, en palabras. "hace 4 h" dice mas de un vistazo que
    una hora exacta cuando lo que importa es si lleva esperando mucho. */
 function huHace(iso) {
-  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  /* Sin fecha se calla, no escribe "hace NaN dias". Un dato que falta se dice;
+     un NaN en pantalla no significa nada para quien lo lee y ademas parece que
+     el panel se rompio. */
+  const t = iso ? new Date(iso).getTime() : NaN;
+  if (!Number.isFinite(t)) return "sin fecha";
+  const min = Math.round((Date.now() - t) / 60000);
   if (min < 1)  return "recien";
   if (min < 60) return "hace " + min + " min";
   const h = Math.round(min / 60);
@@ -3351,7 +3431,7 @@ async function huCargar() {
   /* `pago1_at` y los montos hacen falta para poder decirle al huesped cuanto
      abono y cuanto le queda. Sin la fecha no se cuenta como pagado: el monto
      puede estar anotado antes de marcarlo. */
-  const CAMPOS = "id,cabana_id,nombre,telefono,desde,hasta,token,adultos,ninos,tinaja,"
+  const CAMPOS = "id,cabana_id,nombre,telefono,desde,hasta,token,adultos,ninos,tinaja,canal,"
                + "pago1_at,pago1_monto,pago2_at,pago2_monto,confirmacion_enviada_at";
   /* Los que llegan en los proximos 30 dias. Mas alla no sirve de nada tenerlos
      delante todos los dias. */
@@ -3397,27 +3477,36 @@ async function pintarHuespedes() {
     return `
       <div class="hu-card" data-huesped="${b.id}">
         <div class="hu-card-top">
-          <div>
+          <span class="avatar${b.canal === "airbnb" ? " airbnb" : ""}">${iniciales(b.nombre)}</span>
+          <div class="fila-txt">
             <b>${esc(b.nombre || "Sin nombre")}</b>
-            <div class="hu-card-sub">${esc(cab ? cab.nombre : b.cabana_id)}
-              &middot; ${yaLlego ? "sale " + fechaCorta(b.hasta) : "llega " + fechaCorta(b.desde)}</div>
+            <!-- Sin el "Cabaña" delante: la seccion entera va de cabañas, y con
+                 la palabra el renglon se parte en dos lineas a 390 px. -->
+            <span>${esc((cab ? cab.nombre : b.cabana_id).replace(/^Cabaña\s+/i, ""))}
+              &middot; ${yaLlego ? "sale " + fechaCorta(b.hasta) : "llega " + fechaCorta(b.desde)}</span>
           </div>
           ${yaLlego
-            ? `<span class="hu-pill ${b.token ? "ok" : ""}">${b.token ? "app enviada" : "sin app"}</span>`
-            : `<span class="hu-pill ${avisado ? "ok" : ""}">${avisado ? "confirmada" : "sin confirmar"}</span>`}
+            ? `<span class="estado ${b.token ? "hecho" : ""}">${b.token ? "app enviada" : "sin app"}</span>`
+            : `<span class="estado ${avisado ? "hecho" : ""}">${avisado ? "confirmada" : "sin confirmar"}</span>`}
         </div>
-        <div class="hu-card-acciones">
-          <!-- Sigue pulsable despues de enviada: un WhatsApp se puede no haber
-               ido, o el huesped puede pedir que se lo repitan. Lo que cambia es
-               que se ve que ya se hizo, para no mandarlo dos veces sin querer. -->
-          <button type="button" class="hu-btn-confirmar${avisado ? " hecho" : ""}" data-confirmar="${b.id}">
-            ${avisado ? "Confirmacion enviada &middot; reenviar" : "Confirmar reserva"}
-          </button>
-          ${yaLlego ? `<button type="button" class="hu-btn-wa" data-enviar="${b.id}">
-            Enviar app por WhatsApp
-          </button>` : ""}
-          <button type="button" class="hu-btn-chat" data-chat="${b.id}">Mensajes</button>
+        <!-- Dos por fila como mucho: tres botones en 390 px se parten en
+             sílabas. Y ninguno lleva el verde de WhatsApp — en esta paleta ese
+             color solo existe como insignia del canal, nunca como fondo de una
+             acción; el acento es uno solo.
+             Sigue pulsable despues de enviada: un WhatsApp se puede no haber
+             ido, o el huesped puede pedir que se lo repitan. Lo que cambia es
+             que se ve que ya se hizo, para no mandarlo dos veces sin querer. -->
+        <div class="botonera">
+          ${yaLlego
+            ? `<button type="button" class="crece" data-enviar="${b.id}">Enviar app por WhatsApp</button>`
+            : `<button type="button" class="crece${avisado ? " hecho" : ""}" data-confirmar="${b.id}">
+                 ${avisado ? "Reenviar confirmacion" : "Confirmar reserva"}
+               </button>`}
+          <button type="button" class="secundario" data-chat="${b.id}">Mensajes</button>
         </div>
+        ${yaLlego ? `<button type="button" class="secundario ancho${avisado ? " hecho" : ""}" data-confirmar="${b.id}">
+          ${avisado ? "Confirmacion enviada &middot; reenviar" : "Confirmar reserva"}
+        </button>` : ""}
       </div>`;
   };
 
@@ -3458,6 +3547,7 @@ async function pintarHuespedes() {
     }
     return `
       <div class="hu-sol ${HU_CERRADA(x) ? "hecha" : ""} tipo-${x.tipo}">
+        <span class="sol-ico">${HU_ICONO[x.tipo] || HU_ICONO.otro}</span>
         <div class="hu-sol-main">
           <div class="hu-sol-head">
             <span class="hu-sol-tipo">${HU_ETIQUETA[x.tipo] || x.tipo}</span>
@@ -3468,12 +3558,13 @@ async function pintarHuespedes() {
           ${x.tiene_foto ? `<button type="button" class="hu-sol-foto" data-foto="${x.id}">Ver la foto</button>` : ""}
         </div>
         ${x.estado === "resuelta"
-          ? '<span class="hu-sol-ok">Listo</span>'
+          ? '<span class="estado hecho">Listo</span>'
           : x.estado === "rechazada"
           /* Dicho tal cual, y no como un "listo" mas: al revisar el dia hay que
              poder ver de un vistazo a quien se le nego un turno, que es quien
-             probablemente espera que le ofrezcan otra hora. */
-          ? '<span class="hu-sol-nok">Rechazada</span>'
+             probablemente espera que le ofrezcan otra hora. Sin fondo y en
+             tinta de peligro — la unica solicitud que se cierra en negativo. */
+          ? '<span class="estado rechazada">Rechazada</span>'
           : x.tipo === "tinaja"
             /* La tinaja no es "hecho" o "no hecho": es un turno que hay que
                conceder o negar, y hasta que se aprueba no existe en la agenda.
@@ -3922,6 +4013,20 @@ const CATEGORIAS = [
    que la misma reserva entre dos veces. Mirar el canal no serviria — una
    reserva de Airbnb que teclees tu tambien lleva canal='airbnb'. */
 
+/* Un icono por tipo de problema, calcado de la lamina #atlas-problemas: el
+   calendario tachado para el choque de fechas, el globo con interrogante para
+   el anuncio que Atlas no reconoce, y el triangulo de aviso —el mismo que ya
+   usa la ficha de una reserva para un cruce de tinaja— para cualquier otro
+   fallo. */
+const AT_ICONO = {
+  atlas_choque:      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m14 14-4 4"/><path d="m10 14 4 4"/></svg>',
+  atlas_desconocido: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>',
+  atlas_fallo:       '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+};
+/* El latido de Atlas, vivo o no: el mismo trazo de pulso que la lamina usa
+   para decir "no lo se todavia" cuando lleva rato sin llegar. */
+const AT_ICONO_LATIDO = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg>';
+
 async function pintarAtlas() {
   const caja = $("#vista-atlas");
   if (!caja) return;
@@ -3963,6 +4068,7 @@ async function pintarAtlas() {
 
   const filaProblema = (p) => `
     <div class="at-problema">
+      <span class="ico-teal">${AT_ICONO[p.tipo] || AT_ICONO.atlas_fallo}</span>
       <div class="at-problema-txt">
         <b>${esc(p.titulo)}</b>
         <div class="av-sub">${esc(p.cuerpo)}</div>
@@ -3998,7 +4104,7 @@ async function pintarAtlas() {
     <h2 class="titulo-seccion">Atlas</h2>
 
     <div class="at-estado ${min === null ? "desconocido" : (vivo ? "vivo" : "caido")}">
-      <span class="at-punto"></span>
+      <span class="ico-teal">${AT_ICONO_LATIDO}</span>
       <div>
         <b>${min === null ? "Estado desconocido" : (vivo ? "Live" : "Desconectado")}</b>
         <div class="av-sub">${estadoTxt}</div>
@@ -4053,6 +4159,11 @@ async function atlasVisto(id) {
 }
 
 
+/* La campana de la lamina de Avisos: sonando cuando este telefono los recibe,
+   tachada en cualquier otro estado (bloqueado, sin https, sin activar...). */
+const AV_ICONO_ON  = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8.5a6 6 0 1 0-12 0c0 6-2.5 7.5-2.5 7.5h17S18 14.5 18 8.5"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></svg>';
+const AV_ICONO_OFF = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5"/><path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="m2 2 20 20"/></svg>';
+
 async function pintarAvisos() {
   const caja = $("#vista-avisos");
   if (!caja) return;
@@ -4072,6 +4183,7 @@ async function pintarAvisos() {
   caja.innerHTML = `
     <h2 class="titulo-seccion">Avisos a este telefono</h2>
     <div class="av-estado ${estado}">
+      <span class="ico-teal">${estado === "activo" ? AV_ICONO_ON : AV_ICONO_OFF}</span>
       <div>
         <b>${estado === "activo" ? "Activados" : "Desactivados"}</b>
         <div class="av-sub">${explica}</div>
@@ -4848,10 +4960,21 @@ async function iniciar() {
     const VER = (document.querySelector('script[src*="app.js"]') || {}).src || "";
     const nv = (VER.match(/v=(\d+)/) || [])[1];
     const h = st.tarifaHoy;
-    if (nv) $("#version-panel").textContent = "v" + nv;
+    /* El orden importa y estaba al reves: `textContent` sobre #sub-header borra
+       todo lo que tenga dentro, incluido el <span> de la version. Se escribia
+       la version y una linea despues se la llevaba por delante, asi que el
+       numero no se vio nunca. Primero el texto, y la version se vuelve a colgar
+       despues. */
     $("#sub-header").textContent = h && h.nombre
       ? `${h.nombre} ${clp(h.precio_base)} - minimo ${st.reglas.minimo_noches} noches`
       : `Base ${clp(st.tarifaBase.precio_base)} - minimo ${st.reglas.minimo_noches} noches`;
+    if (nv) {
+      const marca = document.createElement("span");
+      marca.id = "version-panel";
+      marca.style.cssText = "opacity:.45;font-size:10px;margin-left:8px";
+      marca.textContent = "v" + nv;
+      $("#sub-header").appendChild(marca);
+    }
 
     $("#login").hidden = true; $("#app").hidden = false;
   } catch (err) {

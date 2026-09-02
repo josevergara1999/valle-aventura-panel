@@ -14,41 +14,63 @@
      Al cambiar el número cambia la dirección, y una dirección nueva no está en
      ninguna caché. Se sube junto con `LZ_VER` de `luces.js`, que lo enseña en
      una esquina del mapa para poder comprobarlo de un vistazo. -->
-<link rel="stylesheet" href="tokens.css?v=33">
-<link rel="stylesheet" href="styles.css?v=33">
+<link rel="stylesheet" href="tokens.css?v=34">
+<link rel="stylesheet" href="styles.css?v=34">
 <!-- El pallet va en su propio archivo por tamaño, no por color: consume
      los mismos tokens que el resto, así que la paleta se sigue cambiando
      desde tokens.css y nada más. -->
-<link rel="stylesheet" href="pallet.css?v=33">
+<link rel="stylesheet" href="pallet.css?v=34">
 </head>
 <body>
 <!--
-THESIS: Este panel es el libro de registro de un refugio, no un dashboard de
-reservas. Rechaza la tarjeta blanca con acento azul de Guesty y Smoobu, y
-rechaza la app verde de naturaleza que la palabra "montaña" hace escribir sola.
+TESIS: Una herramienta de montaña que se usa de pie, con una mano y a veces al
+sol. No es un dashboard: no hay nada que "monitorizar", hay cosas que hacer hoy.
+Rechaza la tarjeta blanca con acento azul de Guesty y Smoobu, y rechaza la app
+verde de naturaleza que la palabra "montaña" hace escribir sola.
 
-OWN-WORLD: Papel de cuaderno gris hueso —frío, nunca crema— rayado a intervalo
-fijo. Tinta ferrogálica azul-negra. Un solo acento: el rojo de timbre, que marca
-el margen y sella los estados. Rótulos en versalitas grabadas. Los estados son
-timbres rectangulares, no píldoras redondeadas.
+MUNDO PROPIO: Fondo #E7E6E0 y tarjetas crema #F2F1EC a 24 px de radio con una
+sombra suave. UN SOLO ACENTO, el teal #143D4A, con su piel pálida #DDE7EA para
+los fondos. Píldoras de 46 px, campos de 48 sobre #E4E3DC, rótulos de sección en
+versalitas de 10.5 px con .16em de tracking. Tipografía del sistema, siempre.
 
-STORY: Ves quién entra y quién sale hoy, tocas una fecha para mirar cómo viene,
-y anotas la reserva con quién es, por dónde llegó y qué pagó.
+No hay color de alarma en esta paleta: lo urgente se dice con peso y con la
+palabra, y borrar lleva el color solo en la letra, nunca en un fondo rojo. Los
+colores de marca (WhatsApp, Airbnb, Instagram) existen únicamente dentro de la
+insignia de su canal, jamás como fondo de una acción.
 
-FIRST VIEWPORT: Hoy arriba, con el margen rojo a la izquierda de la hoja. El
-calendario del mes debajo. La acción primaria (+ Reservar) aparece al tocar un
-día, no antes.
+HISTORIA: Ves quién entra y quién sale hoy, tocas una fecha para mirar cómo
+viene, y anotas la reserva con quién es, por dónde llegó y qué pagó.
 
-FORM: Libro de registro de refugio, candidato 4 de 7, seed fd117ee8.
+PRIMER VIEWPORT: Hoy arriba, en un solo bloque con los tres grupos. El
+calendario debajo, con tres rayas por día —una por cabaña, siempre en el mismo
+orden—. La acción primaria (+ Reservar) aparece al tocar un día, no antes.
 
-FINISH: unreviewed and undocumented is unfinished; this build ends with the
-finish review, the verdict, and DESIGN.md
+REGLAS QUE NO SE NEGOCIAN
+  · Ningún vacío se deja en blanco: siempre dice por qué está vacío. Un hueco
+    mudo no se distingue de un fallo, y aquí uno escondió un error durante meses.
+  · Cada sección de Finanzas nombra el mes del que habla.
+  · Cualquier capa a pantalla completa va por encima de `nav.tabs` (z-index 70)
+    y además la esconde: si no, se come los últimos 62 px, que es donde está el
+    botón que cierra la acción.
+  · Se mide en 390×844. En ancho de escritorio la hoja se centra por media query
+    y los fallos de la barra no se reproducen.
+  · Cero emojis. Iconos de Lucide, trazo 1.9.
+
+DE DÓNDE SALE: Claude Design, 1-sep-2026. Las 60 pantallas dibujadas y medidas
+están en `panel-rediseno/panel.html`, y sus tokens en `panel-rediseno/base.css`
+— que es de donde vino `tokens.css`. Ahí se mira antes de inventar un valor.
 -->
 
 <!-- ── Login ─────────────────────────────────────────────────────────────── -->
+<!-- La misma cabecera de las pantallas de dentro (marca / título / subtítulo
+     en columna, lámina `#entrar` de panel-rediseno): que entrar se parezca a
+     estar dentro es lo que hace que no se sienta un formulario prestado. -->
 <div id="login" class="login" hidden>
-  <h1>Valle Aventura</h1>
-  <p class="sub">Panel de precios y disponibilidad</p>
+  <div class="cabecera-txt">
+    <span class="marca">Valle Aventura</span>
+    <h1 class="titulo">Entrar</h1>
+    <p class="sub subtitulo">Panel de precios y disponibilidad</p>
+  </div>
   <div id="login-error" class="aviso error" hidden></div>
   <form id="form-login">
     <div class="campo">
@@ -59,7 +81,7 @@ finish review, the verdict, and DESIGN.md
       <label for="clave">Contraseña</label>
       <input type="password" id="clave" autocomplete="current-password" required>
     </div>
-    <button class="ancho" type="submit">Entrar</button>
+    <button class="ancho alto" type="submit">Entrar</button>
   </form>
 </div>
 
@@ -108,11 +130,16 @@ finish review, the verdict, and DESIGN.md
           <span><i style="background:var(--parcial)"></i>Seleccionado</span>
           <span><i class="pt-hoy"></i>Hoy</span>
         </div>
+        <!-- La leyenda explica las RAYAS, que es lo que ahora hay que saber
+             leer: cada día lleva una por cabaña y siempre en el mismo orden,
+             así una estadía se sigue a lo largo de la semana. Antes describía
+             solo el color de fondo del día, que ya no es el dato principal. -->
         <div class="leyenda" id="leyenda-conjunto">
-          <span><i style="background:var(--hoja-2);border:1px solid var(--raya-fuerte)"></i>Las 3 libres</span>
-          <span><i style="background:var(--parcial)"></i>Quedan algunas</span>
-          <span><i style="background:var(--ocupado)"></i>Sin disponibilidad</span>
+          <span><i class="raya-ley libre"></i>Libre</span>
+          <span><i class="raya-ley ocupada"></i>Ocupada</span>
+          <span><i class="raya-ley airbnb"></i>Airbnb</span>
           <span><i class="pt-hoy"></i>Hoy</span>
+          <span class="leyenda-nota">Tres rayas por día: Shangri-la, El Chueco, Nevados</span>
         </div>
       </div>
 
@@ -418,13 +445,13 @@ finish review, the verdict, and DESIGN.md
   </nav>
 </div>
 
-<script src="config.js?v=33"></script>
-<script src="pallet.js?v=33"></script>
+<script src="config.js?v=34"></script>
+<script src="pallet.js?v=34"></script>
 <!-- El mapa del complejo, antes que `app.js` para que `LZ` ya exista cuando
      arranca el panel. Es el diseño de Claude Design portado a JavaScript a
      secas: sus estilos y posiciones van tal cual, solo cambia el motor. -->
-<script src="luces.js?v=33"></script>
-<script src="app.js?v=33"></script>
-<script src="menu.js?v=33"></script>
+<script src="luces.js?v=34"></script>
+<script src="app.js?v=34"></script>
+<script src="menu.js?v=34"></script>
 </body>
 </html>

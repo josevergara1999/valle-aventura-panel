@@ -1,8 +1,22 @@
-/* Valle Aventura — panel. Mobile-first (~390px). Todo el color vive en tokens.css. */
+/* ============================================================================
+   Valle Aventura — panel. Mobile-first (~390px). Todo el color vive en
+   tokens.css.
+   ============================================================================
+   Lenguaje nuevo (Claude Design, 1-sep-2026): fondo crudo, tarjetas color
+   hueso a 24px de radio con sombra suave, un solo acento teal con su piel
+   pálida. Nada de aquí se inventa — los valores exactos, los radios y las
+   combinaciones de color salen de `base.css` y de las pantallas ya aprobadas
+   en `panel-rediseno/panel.html`.
+
+   LA REGLA QUE MANDA: `app.js` pinta con cadenas de texto — no hay
+   plantillas — así que cada nombre de clase de aquí abajo es intocable. Este
+   archivo traduce esas clases al lenguaje nuevo; no las renombra ni les
+   cambia el marcado.
+   ============================================================================ */
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
-html { background: var(--papel); }
+html { background: var(--fondo); }
 
 /* El rebote de iOS es lo que descolocaba la barra. Al llegar al final, Safari
    estira la página y se lleva con ella TODO lo anclado al viewport: la barra de
@@ -11,179 +25,166 @@ html { background: var(--papel); }
    desplazar. Sin rebote, no hay a dónde arrastrarla. */
 html, body { overscroll-behavior-y: none; }
 
-/* Dos halos muy suaves sobre el papel: dan la profundidad que en la web hace la
-   foto de fondo, sin cargar una imagen que en la montaña no bajaría.
-   Van en una capa fija propia y NO en `background-attachment: fixed` del body:
-   en iOS ese modo saca el desplazamiento del compositor, y a partir de ahí todo
-   lo fijo se repinta tarde y a destiempo. Se ve igual; se mueve bien. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(1100px 700px at 78% -10%, var(--papel-halo), transparent 62%),
-    radial-gradient(900px 600px at 8% 108%, var(--papel-halo), transparent 58%);
-}
-
-/* Los enlaces son casi siempre teléfonos: van en el teal de timbre, no en el
-   azul del navegador, que es de otro mundo. */
-a { color: var(--timbre); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--timbre) 35%, transparent); }
+/* Los enlaces son casi siempre teléfonos: van en el teal del acento. */
+a { color: var(--teal); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--teal) 35%, transparent); }
 
 body {
   font-family: var(--fuente);
-  /* El papel lo pone `html`. Aquí no va fondo: los halos viven en `body::before`
-     —ver abajo— y no en un `background-attachment: fixed`. */
+  background: var(--fondo);
   color: var(--tinta);
   font-size: 15px;
   line-height: 1.5;
-  /* La barra de pestañas es fija abajo: sin este colchón el último control
-     queda debajo de ella y no se puede tocar. */
-  padding-bottom: calc(var(--toque) + var(--e6) + env(safe-area-inset-bottom));
   -webkit-font-smoothing: antialiased;
+  /* El colchón de abajo lo pone la sección "La barra", más al fondo de este
+     archivo: tiene que sumar también lo que la burbuja sobresale por encima
+     del riel, y aquí no se conoce esa medida todavía. */
 }
 
 /* ── Cabecera ─────────────────────────────────────────────────────────────── */
+/* `<header>` es marcado fijo de `index.html`: no lleva la estructura de
+   `.cabecera` de las pantallas nuevas (marca / título / subtítulo en
+   columna), así que se traduce el PESO de esa cabecera —título grande,
+   subtítulo apagado, sin tarjeta ni cristal— en vez de perseguir su marcado. */
 header {
-  background: color-mix(in srgb, var(--hoja) 82%, transparent);
-  backdrop-filter: var(--vidrio);
-  -webkit-backdrop-filter: var(--vidrio);
-  border-bottom: 1px solid var(--raya);
+  background: var(--fondo);
   color: var(--tinta);
-  padding: calc(var(--e4) + env(safe-area-inset-top)) var(--e4) var(--e4);
+  padding: calc(var(--e4) + env(safe-area-inset-top)) var(--e4) var(--e3);
   position: sticky; top: 0; z-index: 5;
+  border-bottom: 1px solid transparent;
 }
-header h1 { font-family: var(--fuente-titulo); font-size: 19px; font-weight: 600; letter-spacing: -.01em; }
-header p  { font-size: 12.5px; opacity: .75; margin-top: 2px; }
+header h1 { font: 700 20px/1.1 var(--fuente-titulo); letter-spacing: -.01em; }
+header p  { font-size: 12.5px; color: var(--tinta-3); margin-top: 2px; }
 
 /* ── Estructura ───────────────────────────────────────────────────────────── */
 main    { padding: var(--e4); max-width: 560px; margin: 0 auto; }
 section[hidden] { display: none; }
+/* `display` en el CSS pisa al atributo `hidden` del HTML: sin esta regla dos
+   bloques que se alternan (leyendas, filtros) se ven a la vez. Vale para
+   cualquier elemento con display propio. */
+[hidden] { display: none !important; }
 
-/* Cada tarjeta es una hoja del cuaderno. La raya no se pinta de fondo sino que
-   la hace el borde inferior de cada renglón: en un libro la línea pertenece a
-   la entrada, no a un intervalo de píxeles.
-
-   Sin `backdrop-filter`: la hoja es opaca, así que no cambiaba un píxel y
-   forzaba una capa de composición por tarjeta. */
+/* ── Tarjeta ──────────────────────────────────────────────────────────────── */
+/* La tarjeta crema del lenguaje nuevo: sin borde, con la sombra suave que le
+   da el desprendimiento del fondo en vez de un filete. */
 .tarjeta {
   background: var(--hoja);
-  border: 1px solid var(--raya-fuerte);
-  border-radius: var(--radio);
+  border-radius: var(--r-tarjeta);
   padding: var(--e4);
   margin-bottom: var(--e4);
   box-shadow: var(--sombra);
 }
-/* Versalitas grabadas, como el rótulo de una columna del libro. */
+/* El rótulo de sección, aplicado al `<h2>` plano que ya escribe `app.js`
+   dentro de cada tarjeta ("Del mes", "Tinaja", "Reglas"...). */
 .tarjeta > h2 {
-  font-size: 11px; text-transform: uppercase; letter-spacing: .14em;
-  color: var(--tinta-3); font-weight: 700; margin-bottom: var(--e3);
+  font: 800 10.5px/1 var(--fuente); text-transform: uppercase; letter-spacing: .16em;
+  color: var(--tinta-3); margin-bottom: var(--e3);
 }
 
 /* ── Controles ────────────────────────────────────────────────────────────── */
-label { display: block; font-size: 12.5px; color: var(--tinta-2); margin-bottom: var(--e1); font-weight: 500; }
+label { display: block; font: 500 12.5px/1 var(--fuente); color: var(--tinta-2); margin-bottom: var(--e1); }
 
 input, select, button, textarea {
   font-family: inherit; font-size: 16px; /* 16px evita el zoom automático de iOS */
   min-height: var(--toque);
-  border-radius: var(--radio-chico);
+  border-radius: var(--r-campo);
 }
 
 input, select, textarea {
   width: 100%;
+  min-height: var(--campo-alto);
   background: var(--hoja-2);
-  border: 1px solid var(--raya-fuerte);
+  border: 0;
   color: var(--tinta);
   padding: 0 var(--e3);
 }
-textarea { padding: var(--e3); min-height: 0; }
+textarea { padding: var(--e3); min-height: 96px; line-height: 1.4; resize: none; }
+input::placeholder, textarea::placeholder { color: var(--tinta-off); font-weight: 400; }
 input:focus, select:focus, textarea:focus {
-  outline: 2px solid var(--timbre); outline-offset: 1px; border-color: transparent;
+  outline: 2px solid var(--teal); outline-offset: 1px;
 }
 
 .campo { margin-bottom: var(--e3); }
 .fila  { display: flex; gap: var(--e2); }
 .fila > * { flex: 1; min-width: 0; }
 
+/* El botón, en píldora de 46px. `app.js` no escribe `.btn`: el botón suelto
+   YA es la acción primaria, igual que en el lenguaje nuevo. */
+/* Solo `min-height`, nunca `height`: un `<button>` bare en este panel no es
+   siempre una píldora — también es la celda de un día, la fila de "Hoy" o la
+   barra de la línea de tiempo, y esas necesitan su propio alto de contenido
+   o su `aspect-ratio`. Con `height` fijo aquí, todas quedaban aplastadas o
+   estiradas a 46px sin importar lo que dijera su propia regla más abajo. */
 button {
-  border: none; cursor: pointer; font-weight: 600;
-  padding: 0 var(--e4);
-  /* Papel sobre el teal de timbre: el botón es un sello. */
-  background: var(--timbre); color: var(--tinta-sobre-teal);
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 0; cursor: pointer;
+  min-height: var(--toque); padding: 0 var(--e4);
+  border-radius: 999px;
+  background: var(--teal); color: var(--hoja);
+  font: 600 14px/1 var(--fuente); white-space: nowrap;
   transition: opacity .15s ease, transform .1s ease;
 }
 button:active   { transform: scale(.985); }
 button:disabled { opacity: .45; cursor: default; }
 button.ancho    { width: 100%; }
-button.secundario {
-  background: var(--hoja-2); color: var(--tinta); border: 1px solid var(--raya-fuerte);
-}
-button.peligro    { background: transparent; color: var(--error); border: 1px solid var(--error); }
+button.secundario { background: var(--hoja-2); color: var(--tinta); }
+/* Borrar no lleva fondo: el color va en la letra y el contorno se calla. */
+button.peligro  { background: transparent; border: 1.5px solid var(--borde); color: var(--peligro); }
 
 /* ── Calendario ───────────────────────────────────────────────────────────── */
 .mes-nav { display: flex; align-items: center; gap: var(--e2); margin-bottom: var(--e3); }
-.mes-nav .titulo { flex: 1; text-align: center; font-weight: 600; }
+.mes-nav .titulo { flex: 1; text-align: center; font: 700 17px/1 var(--fuente); letter-spacing: -.01em; }
 /* 44×44 de verdad: son las dos flechas que más se tocan de toda la app, con una
-   mano y en movimiento. Medían 31 de ancho, que es un fallo de puntería cada
-   pocas veces y un mes entero de diferencia cuando falla. */
+   mano y en movimiento. */
 .mes-nav button {
-  min-width: 44px; min-height: 44px; padding: 0;
-  background: transparent; color: var(--tinta-2); border: 1px solid var(--raya);
-  font-size: 20px; line-height: 1;
+  min-width: 44px; min-height: 44px; width: 44px; height: 44px; padding: 0;
+  background: var(--hoja-2); color: var(--tinta-2); border-radius: 50%;
+  font-size: 18px; line-height: 1;
 }
 
-.grilla { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.grilla { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px 4px; }
 .grilla .dow {
-  text-align: center; font-size: 10.5px; color: var(--tinta-3);
+  text-align: center; font: 600 10px/1 var(--fuente); color: var(--tinta-3);
   text-transform: uppercase; letter-spacing: .06em; padding-bottom: var(--e1);
 }
 .dia {
   position: relative;
   aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
-  border-radius: var(--radio-chico); font-size: 14px; font-variant-numeric: tabular-nums;
-  background: var(--hoja-2); border: 1px solid transparent; color: var(--tinta);
-  cursor: pointer; user-select: none; min-height: 0; padding: 0; font-weight: 500;
+  border-radius: 14px; font: 500 14px/1 var(--fuente); font-variant-numeric: tabular-nums;
+  background: var(--hoja-2); border: 0; color: var(--tinta);
+  cursor: pointer; user-select: none; min-height: 0; padding: 0;
 }
 .dia.vacio    { background: transparent; cursor: default; }
-/* .62 y no menos: por debajo de eso el número del día pasado cae bajo 4,5:1 y
-   deja de leerse al sol. Los tonos están medidos a plena opacidad, así que
-   cualquier `opacity` encima se los come. */
-.dia.pasado   { color: var(--tinta-3); opacity: .62; cursor: default; }
-/* Sin disponibilidad: la línea tachada del libro. El rojo aquí se leería como
-   error, y el rojo de este mundo es el del timbre: se reserva para sellar. */
-.dia.ocupado  { background: var(--ocupado); color: var(--ocupado-tx); text-decoration: line-through; }
-.dia.airbnb   { background: var(--ocupado); color: var(--ocupado-tx); text-decoration: line-through;
-                box-shadow: inset 0 0 0 1px var(--airbnb); }
-.dia.sel      { outline: 2px solid var(--timbre); outline-offset: -2px; }
-.dia.rango    { background: var(--parcial); color: var(--timbre); font-weight: 600; }
-/* El día de hoy NO lleva rojo ni borde: el rojo es del selector y sólo del
-   selector. Si los dos se marcan igual, cada vez que hoy cae cerca del rango
-   hay que contar los días para saber cuál es cuál. Hoy es un punto de tinta
-   arriba, una forma distinta que no compite con nada. */
-.dia.hoy      { font-weight: 700; }
-.dia.hoy::after {
-  content: ""; position: absolute; top: 5px; left: 50%; transform: translateX(-50%);
-  width: 4px; height: 4px; border-radius: 50%; background: var(--tinta);
-}
-.dia.hoy.ocupado::after, .dia.hoy.airbnb::after { background: var(--ocupado-tx); }
+.dia.pasado   { color: var(--tinta-3); opacity: .55; cursor: default; }
+/* Sin disponibilidad: el mismo acento a fondo completo, con el número en
+   crema — el tratamiento más fuerte de la grilla, porque no queda nada que
+   ofrecer. Airbnb se distingue con un anillo de su color por dentro: sigue
+   siendo un día lleno, solo que por otra puerta. */
+.dia.ocupado  { background: var(--teal); color: var(--hoja); font-weight: 700; }
+.dia.airbnb   { background: var(--teal); color: var(--hoja); font-weight: 700;
+                box-shadow: inset 0 0 0 2px var(--airbnb); }
+.dia.sel      { outline: 2px solid var(--teal); outline-offset: -2px; }
+.dia.rango    { background: var(--teal-piel); color: var(--teal); font-weight: 700; }
+/* El día de hoy va con un anillo, nunca con un relleno: un relleno chocaría
+   con el que ya usan "ocupado" y "parcial", y es justo lo que le pasó a la
+   variante en franjas del diseño aprobado — el día de hoy se pinta en teal
+   sólido y sus propias marcas de ocupación, del mismo teal, desaparecen
+   encima. Aquí el aro compone con cualquier fondo sin taparlo. */
+.dia.hoy { box-shadow: inset 0 0 0 2px var(--teal); font-weight: 700; }
+.dia.hoy.sel { box-shadow: inset 0 0 0 2px var(--teal), inset 0 0 0 4px var(--hoja); }
 
 /* Vista de conjunto: el día muestra cuántas cabañas quedan. Un día con una sola
    tomada NO es un día ocupado — quedan dos por vender, y pintarlo igual que un
    lleno haría rechazar reservas que sí caben. */
 .dia.multi    { flex-direction: column; gap: 1px; line-height: 1.05; }
-.dia.parcial  { background: var(--parcial); color: var(--tinta); }
-.dia .libres  { font-size: 8.5px; font-weight: 700; letter-spacing: -.01em; opacity: .8; }
-.dia.rango-multi { outline: 2px solid var(--timbre); outline-offset: -2px; }
+.dia.parcial  { background: var(--teal-piel); color: var(--teal); font-weight: 700; }
+.dia .libres  { font: 700 8.5px/1 var(--fuente); letter-spacing: -.01em; opacity: .85; }
+.dia.rango-multi { outline: 2px solid var(--teal); outline-offset: -2px; }
 
-.leyenda { display: flex; flex-wrap: wrap; gap: var(--e3); margin-top: var(--e3); font-size: 11.5px; color: var(--tinta-2); }
-/* `display` en el CSS pisa al atributo `hidden` del HTML: sin esta regla las dos
-   leyendas se ven a la vez. Vale para cualquier elemento con display propio. */
-[hidden] { display: none !important; }
-.leyenda i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
-/* Mismo punto que lleva el día de hoy en la grilla, para que la leyenda se lea
+.leyenda { display: flex; flex-wrap: wrap; gap: var(--e2) var(--e4); margin-top: var(--e2); font-size: 11.5px; color: var(--tinta-2); }
+.leyenda i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; margin-right: 5px; vertical-align: -2px; }
+/* Mismo punto que lleva el día de hoy en el rótulo, para que la leyenda se lea
    sin traducir nada. */
-.leyenda i.pt-hoy { width: 5px; height: 5px; border-radius: 50%; background: var(--tinta); margin: 0 8px 0 3px; vertical-align: 2px; }
+.leyenda i.pt-hoy { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); margin: 0 8px 0 3px; vertical-align: 2px; }
 
 /* ── Mes / Semana ─────────────────────────────────────────────────────────── */
 /* El filtro de cabaña comparte fila con el conmutador de vista: es un control
@@ -192,21 +193,18 @@ button.peligro    { background: transparent; color: var(--error); border: 1px so
 .fila-vistas { display: flex; gap: var(--e2); align-items: center; margin-bottom: var(--e3); }
 .fila-vistas .segmentado { flex: 1; margin-bottom: 0; }
 .fila-vistas select {
-  flex: none; width: auto; max-width: 44%; min-height: 42px;
-  padding: 0 var(--e5) 0 var(--e3); font-size: 12.5px;
+  flex: none; width: auto; max-width: 46%; min-height: 42px; height: 42px;
+  padding: 0 var(--e5) 0 var(--e4); font-size: 12.5px; border-radius: 999px;
 }
 .segmentado {
   display: flex; gap: 2px; padding: 3px; margin-bottom: var(--e3);
-  background: var(--hoja-2); border: 1px solid var(--raya); border-radius: var(--radio-chico);
+  background: var(--hoja-2); border-radius: 999px;
 }
-/* 36px de alto, no 44: el objetivo mide 133px de ancho, así que la puntería no
-   es el problema, y una píldora de 44 dentro de una tarjeta se come el sitio
-   del calendario. Pasa el mínimo de WCAG (24×24) con holgura. */
 .segmentado button {
-  flex: 1; min-height: 36px; border-radius: var(--radio-chico); font-size: 12.5px;
-  background: transparent; color: var(--tinta-2);
+  flex: 1; min-height: 32px; height: 32px; border-radius: 999px; font: 600 12.5px/1 var(--fuente);
+  background: transparent; color: var(--tinta-2); padding: 0 10px;
 }
-.segmentado button[aria-selected="true"] { background: var(--timbre); color: var(--tinta-sobre-teal); }
+.segmentado button[aria-selected="true"] { background: var(--teal); color: var(--hoja); }
 
 /* ── Línea de tiempo ──────────────────────────────────────────────────────── */
 /* Una fila por cabaña, una columna por día, y cada estadía es una barra que
@@ -216,10 +214,6 @@ button.peligro    { background: transparent; color: var(--error); border: 1px so
   overflow-x: auto;
   overscroll-behavior-x: contain;      /* no arrastra la página al llegar al borde */
   -webkit-overflow-scrolling: touch;   /* inercia y rebote nativos: no se reimplementan */
-  /* Sin sangrado a los bordes de la tarjeta: el relleno lateral del contenedor
-     de desplazamiento dejaba una franja a la izquierda del rótulo fijo, y por
-     ahí se veían pasar los días al desplazar. El rótulo tiene que anclar
-     exactamente en el borde del área que se desplaza. */
   padding-bottom: var(--e2);
 }
 .tl-cuerpo {
@@ -240,187 +234,144 @@ button.peligro    { background: transparent; color: var(--error); border: 1px so
 .tl-rotulo {
   position: sticky; left: 0; z-index: 2;
   background: var(--hoja);
-  border-right: 1px solid var(--raya-fuerte);
   padding: var(--e2) var(--e2) var(--e2) 0;
-  font-size: 12px; font-weight: 600; color: var(--tinta-2);
+  font: 600 12px/1 var(--fuente); color: var(--tinta-2);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  /* `stretch` y no `height: 100%`: en la fila de cabecera el rótulo va vacío, y
-     con altura porcentual no llegaba a cubrir — los días se veían pasar por
-     debajo al desplazar. */
   align-self: stretch; display: flex; align-items: center;
 }
 
 .tl-dia {
-  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
   background: transparent; color: var(--tinta-2);
-  border-radius: var(--radio-chico); padding: var(--e2) 0;
+  border-radius: 12px; padding: var(--e2) 0;
   min-height: 0; font-weight: 500;
 }
-.tl-dow { font-size: 9.5px; text-transform: uppercase; letter-spacing: .1em; color: var(--tinta-3); }
-/* Tracking negativo en el número grande: al crecer, las cifras se leen
-   demasiado separadas. */
-.tl-num { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-.tl-dia.pasado   { opacity: .62; }
+.tl-dow { font: 600 9.5px/1 var(--fuente); text-transform: uppercase; letter-spacing: .08em; color: var(--tinta-3); }
+.tl-num { font: 600 16px/1 var(--fuente); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.tl-dia.pasado      { opacity: .55; }
 /* Relleno de los meses vecinos: están para que la ventana no empiece a mitad de
    semana, no porque pertenezcan al mes que se está mirando. */
-.tl-dia.de-otro-mes { opacity: .45; }
-/* El día 1 lleva el nombre del mes en vez del día de la semana, y una línea a
-   la izquierda: recorriendo 42 columnas seguidas hay que saber dónde se cruzó. */
-.tl-dia.cambia-mes .tl-dow { color: var(--timbre); font-weight: 700; }
-.tl-dia.es-hoy   { color: var(--timbre); }
+.tl-dia.de-otro-mes { opacity: .4; }
+/* El día 1 lleva el nombre del mes en vez del día de la semana. */
+.tl-dia.cambia-mes .tl-dow { color: var(--teal); font-weight: 700; }
+.tl-dia.es-hoy   { color: var(--teal); }
 .tl-dia.es-hoy .tl-dow,
-.tl-dia.es-hoy .tl-num { color: var(--timbre); }
-.tl-dia.sel      { outline: 2px solid var(--timbre); outline-offset: -2px; }
-.tl-dia.en-rango { background: var(--parcial); }
+.tl-dia.es-hoy .tl-num { color: var(--teal); }
+.tl-dia.sel      { box-shadow: inset 0 0 0 2px var(--teal); border-radius: 12px; }
+.tl-dia.en-rango { background: var(--teal-piel); border-radius: 12px; }
 
-/* La retícula es un fondo, no celdas: ver el comentario en `pintarSemana`. Una
-   línea cada columna, empezando después del rótulo. */
+/* La retícula es un fondo, no celdas: una línea cada columna, empezando
+   después del rótulo. */
 .tl-datos {
-  min-height: var(--alto-fila-tl);
-  background-image: linear-gradient(90deg, var(--raya) 0 1px, transparent 1px);
+  min-height: 56px;
+  background-image: linear-gradient(90deg, var(--borde) 0 1px, transparent 1px);
   background-size: var(--w-col) 100%;
   background-position: var(--w-rotulo) 0;
   background-repeat: repeat-x;
-  border-top: 1px solid var(--raya);
+  border-top: 1px solid var(--borde);
 }
-.tl-cabecera { border-bottom: 1px solid var(--raya-fuerte); }
+.tl-cabecera { border-bottom: 1px solid var(--borde); }
 
-/* La barra vive en la misma rejilla que las celdas, así que su tramo se declara
-   en columnas y no en píxeles calculados a mano. */
 /* Medios días: la barra abarca también la columna del día de salida, y aquí se
-   le recorta media columna por cada extremo. Empieza a mitad del día de entrada
-   y termina a mitad del de salida — que es lo que pasa de verdad: se van a las
-   11 y entran a las 16. La otra mitad del día queda libre y ahí calza, al ras,
-   la barra de quien toma esa misma cabaña ese mismo día. */
+   le recorta media columna por cada extremo — empieza a mitad del día de
+   entrada y termina a mitad del de salida, que es lo que pasa de verdad: se
+   van a las 11 y entran a las 16. */
 .tl-barra {
   grid-row: 1;
   display: flex; align-items: center; gap: 5px;
   margin-top: 7px; margin-bottom: 7px;
-  /* El medio día, más una pizca. Tocándose al ras, dos reservas seguidas se
-     leían como una sola barra larga con dos nombres; con 5px de aire entre
-     ellas se ven como dos, y el punto de encuentro sigue estando en el medio
-     del día —el corrimiento es de 2,5px sobre una columna de 76. */
-  margin-left: calc(var(--w-col) / 2 + var(--aire-barra));
-  margin-right: calc(var(--w-col) / 2 + var(--aire-barra));
+  margin-left: calc(var(--w-col) / 2 + 2.5px);
+  margin-right: calc(var(--w-col) / 2 + 2.5px);
   padding: 0 var(--e2);
-  min-height: 42px; border-radius: var(--radio-chico);
-  font-size: 12.5px; font-weight: 600; text-align: left;
+  min-height: 42px; border-radius: 12px;
+  font: 600 12.5px/1 var(--fuente); text-align: left;
   overflow: hidden; white-space: nowrap;
-  /* El relleno lo pone el estado de pago, más abajo. */
   background: var(--hoja); color: var(--tinta);
-  border: 1px solid var(--timbre-claro);
+  border: 1px solid var(--borde);
 }
 
-/* CUÁNTO SE PAGÓ, EN LA BARRA MISMA. Es el dato que se busca al mirar el mes
-   —quién debe— y hasta ahora obligaba a abrir la ficha una por una.
+/* CUÁNTO SE PAGÓ, EN LA BARRA MISMA:
      · vacía    = no ha pagado nada
      · a medias = el anticipo, el 50%
      · llena    = pagado completo
-   El texto se mantiene en tinta oscura salvo en la llena: un nombre que cruza
-   el borde del degradado no puede cambiar de color a la mitad. */
-.tl-barra[data-pagos="0"] {
-  background: var(--hoja);
-}
-/* El anticipo: degradado SUAVE, del teal lleno al lavado. No un escalón al 50%
-   —eso se leía como dos barras pegadas— sino una transición continua, que es
-   lo que dice "va a medias" sin fingir una precisión que el dato no tiene.
-   El extremo claro es lo más claro que aguanta texto blanco (4,8:1); con la
-   cola en blanco el nombre la cruzaba en las barras cortas y cambiaba de color
-   a la mitad de la palabra. */
+   Un solo acento: la escala va de hoja a teal, sin colores nuevos. */
+.tl-barra[data-pagos="0"] { background: var(--hoja); }
 .tl-barra[data-pagos="1"] {
-  background: linear-gradient(90deg,
-    var(--timbre) 0 2%, var(--timbre-lavado) 34%);
-  color: var(--tinta-sobre-teal);
-  border-color: var(--timbre);
+  background: linear-gradient(90deg, var(--teal) 0 2%, var(--teal-claro) 34%);
+  color: var(--hoja);
+  border-color: var(--teal);
 }
 .tl-barra[data-pagos="2"] {
-  background: var(--timbre); color: var(--tinta-sobre-teal);
-  border-color: var(--timbre);
+  background: var(--teal); color: var(--hoja);
+  border-color: var(--teal);
 }
 .tl-barra .tl-nombre { overflow: hidden; text-overflow: ellipsis; }
-.tl-barra .insignia  { flex: none; margin: 0; width: 18px; height: 18px; border-radius: 5px; }
+.tl-barra .insignia  { flex: none; margin: 0; width: 18px; height: 18px; border-radius: 6px; }
 .tl-barra .insignia svg { width: 11px; height: 11px; }
 /* Un bloqueo no es una venta: no tiene pagos que mostrar, así que se sale de la
-   escala y va en tinta apagada. Va después de las reglas de pago para ganarles. */
+   escala y va apagado. */
 .tl-barra.es-bloqueo,
 .tl-barra.es-bloqueo[data-pagos="0"] {
-  background: var(--ocupado); color: var(--ocupado-tx);
-  border-color: var(--raya-fuerte); border-style: dashed;
+  background: var(--hoja-2); color: var(--tinta-2);
+  border-color: var(--borde); border-style: dashed;
 }
 /* Cortada por el borde de la ventana: el canto recto avisa que la estadía sigue
-   fuera de lo que se está viendo, y no que empiece o termine ahí. */
-/* Cortada por el borde: llega al canto sin el medio día ni el aire, porque ahí
-   no hay una salida sino el final de lo que se está mirando. */
+   fuera de lo que se está viendo. */
 .tl-barra.viene { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: 0; }
 .tl-barra.sigue { border-top-right-radius: 0; border-bottom-right-radius: 0; margin-right: 0; }
-/* La respuesta va en el toque, no al soltar. */
 .tl-barra:active { transform: scale(.985); }
 
-/* Las tres muestras son las barras de verdad, en chico: si la leyenda se dibuja
-   con otros valores, tarde o temprano dice una cosa y la barra otra. */
-.tl-leyenda i { width: 22px; height: 12px; border-radius: 3px; border: 1px solid var(--timbre-claro); }
+/* Las muestras de la leyenda son la barra real en chico. */
+.tl-leyenda i { width: 22px; height: 12px; border-radius: 4px; border: 1px solid var(--teal-medio); }
 .tl-leyenda i.m0 { background: var(--hoja); }
-.tl-leyenda i.m1 { background: linear-gradient(90deg, var(--timbre) 0 2%, var(--timbre-lavado) 34%); border-color: var(--timbre); }
-.tl-leyenda i.m2 { background: var(--timbre); border-color: var(--timbre); }
+.tl-leyenda i.m1 { background: linear-gradient(90deg, var(--teal) 0 2%, var(--teal-claro) 34%); border-color: var(--teal); }
+.tl-leyenda i.m2 { background: var(--teal); border-color: var(--teal); }
 
 /* Hoy cruza todas las filas: es lo único que une la rejilla en vertical. */
 .tl-hoy {
   position: absolute; top: 0; bottom: 0; width: 0;
   left: calc(var(--w-rotulo) + (var(--i) + .5) * var(--w-col));
-  border-left: 1.5px solid var(--timbre);
+  border-left: 1.5px solid var(--teal);
   pointer-events: none; z-index: 1;
 }
 .tl-hoy i {
   position: absolute; top: -3px; left: -4px;
-  width: 7px; height: 7px; border-radius: 50%; background: var(--timbre);
+  width: 7px; height: 7px; border-radius: 50%; background: var(--teal);
 }
 
 /* ── Barra de selección ───────────────────────────────────────────────────── */
 .barra-sel p { font-size: 14px; }
 .barra-sel .sub { color: var(--tinta-3); }
-/* El día a la izquierda, el + a la derecha: la mano derecha del pulgar cae ahí,
-   y la información no se corre de sitio al entrar en modo reserva. */
 .cabecera-sel { display: flex; align-items: flex-start; gap: var(--e3); margin-bottom: var(--e3); }
 .cabecera-sel p { flex: 1; min-width: 0; }
 button.mas {
-  flex: none; min-height: 38px; border-radius: var(--radio-chico);
-  padding: 0 var(--e4); font-size: 13px; display: inline-flex; align-items: center; gap: 5px;
+  flex: none; height: 42px; min-height: 42px; border-radius: 999px;
+  padding: 0 var(--e4); font: 600 13px/1 var(--fuente); display: inline-flex; align-items: center; gap: 5px;
 }
 button.mas span { font-size: 18px; font-weight: 700; line-height: 1; margin-top: -2px; }
 
 /* ── Lo que ya está tomado ────────────────────────────────────────────────── */
-.ocupadas { margin-top: var(--e4); border-top: 1px solid var(--raya); padding-top: var(--e3); }
-/* Sin anidar bajo `.ocupadas`: el mismo encabezado lo usa la sección de hoy, y
-   dos definiciones del mismo rótulo terminan separándose. */
+.ocupadas { margin-top: var(--e4); border-top: 1px solid var(--borde-suave); padding-top: var(--e3); }
 .titulo-ocupadas {
-  font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  font: 800 10.5px/1 var(--fuente); letter-spacing: .14em; text-transform: uppercase;
   color: var(--tinta-3); margin-bottom: var(--e2);
 }
 .ocupada {
-  background: var(--ocupado); border-radius: var(--radio-chico);
-  padding: var(--e2) var(--e3); margin-bottom: var(--e2);
+  background: var(--hoja-2); border-radius: var(--r-campo);
+  padding: var(--e3); margin-bottom: var(--e2);
 }
 .ocupada:last-child { margin-bottom: 0; }
-/* Sin tachar. En el calendario el tachado dice "este día no está disponible";
-   aquí el nombre de la cabaña es un título que hay que leer, y tacharlo lo
-   vuelve difícil de leer sin decir nada nuevo — el título de arriba ya dice que
-   están ocupadas. */
-.ocupada b { display: block; font-size: 14px; color: var(--tinta); }
-/* Quien la tiene pesa más que las fechas: es lo primero que se busca al abrir
-   esto, y hasta ahora se leía más apagado que el dato secundario. */
+.ocupada b { display: block; font: 600 14px/1.2 var(--fuente); color: var(--tinta); }
 .ocupada .sub { display: block; font-size: 12.5px; color: var(--tinta-2); margin-top: 2px; }
-/* Las fechas alineadas bajo el nombre del huésped, no bajo su insignia: así
-   quedan todas en la misma columna aunque los nombres midan distinto. */
 .ocupada .fechas, .ocupada .sin-icono { padding-left: 25px; }
 .ocupada .fechas { color: var(--tinta-3); }
-/* Cada reserva es tocable y abre su ficha. Se pinta como texto, no como botón:
-   dentro de una tarjeta ya gris, un botón más sería ruido. */
+/* Cada reserva es tocable y abre su ficha. */
 .reserva-mini {
   display: block; width: 100%; text-align: left; background: transparent; color: inherit;
-  border-radius: var(--radio-chico); padding: var(--e2) 26px var(--e2) var(--e2);
+  border-radius: 12px; padding: var(--e2) 26px var(--e2) var(--e2);
   margin: 2px 0 0 calc(var(--e2) * -1); font-weight: 500; min-height: 0; position: relative;
 }
-.reserva-mini:hover { background: var(--hoja-2); }
+.reserva-mini:hover { background: var(--hoja); }
 .reserva-mini .flecha {
   position: absolute; right: var(--e2); top: 50%; transform: translateY(-50%);
   color: var(--tinta-3); font-size: 20px; line-height: 1;
@@ -429,79 +380,65 @@ button.mas span { font-size: 18px; font-weight: 700; line-height: 1; margin-top:
 /* ── Hoy ──────────────────────────────────────────────────────────────────── */
 .ninguna { font-size: 13.5px; color: var(--tinta-2); margin: 0; }
 
-/* Rótulo de la sección, fuera de toda caja: las tres que vienen debajo son
-   hermanas, y meterlas dentro de una cuarta caja las volvería una sola. */
 .titulo-seccion {
-  font-size: 12px; text-transform: uppercase; letter-spacing: .1em;
-  color: var(--tinta-3); font-weight: 600;
-  margin: 0 var(--e1) var(--e3);
+  font: 800 10.5px/1 var(--fuente); text-transform: uppercase; letter-spacing: .16em;
+  color: var(--tinta-3); margin: 0 var(--e1) var(--e3);
 }
 
-/* Una caja por grupo, con su color en el canto izquierdo. Quien llega y quien
-   se va son dos tareas distintas del día: en una sola lista corrida hay que
-   releer el encabezado para saber en cuál se está. */
-/* El margen rojo es el de la hoja, y por eso es IGUAL en las tres. Antes cada
-   grupo tenía su propio color de canto —rojo, ámbar, gris—, que en este mundo
-   son tres acentos peleando: el libro tiene uno. Lo que separa los grupos es su
-   rótulo, que dice exactamente lo que pasa, y el peso de la tinta.
-   (Raise del Cracktro Scroller: un solo eje ordena la jerarquía.) */
-/* La raya del libro es la de CADA RENGLÓN, no un rayado de intervalo fijo. Lo
-   probé a 28px y cruzaba por detrás del detalle desplegado y de la caja de
-   pagos: en pantalla eso no se lee como un cuaderno, se lee como un fallo de
-   render. Un renglón, una línea —que es lo que ya hace el borde inferior de
-   cada fila— y el margen teal a la izquierda cargan la identidad. */
-.grupo-hoy {
-  border-left: 2px solid var(--timbre-claro);
-  border-radius: 0 var(--radio) var(--radio) 0;
-}
+/* Quien llega, quien se va y quien se queda: tres tarjetas hermanas. El
+   lenguaje nuevo no reparte un color por grupo — sigue habiendo un solo
+   acento — así que lo que distingue a cada una es un punto pequeño junto a su
+   rótulo, en tres pesos del mismo teal: lleno para lo que hay que preparar
+   hoy, gastado para lo que ya está resuelto, apagado para lo que solo sigue
+   ahí. Es el mismo recurso que usa el diseño aprobado en su lista de "Hoy". */
 .grupo-hoy .titulo-ocupadas { display: flex; align-items: center; gap: 7px; }
-/* Los que llegan pesan más que los que se quedan: es la tarea del día. */
-.grupo-hoy.llegan .titulo-ocupadas { color: var(--tinta); }
+.grupo-hoy .titulo-ocupadas::before {
+  content: ""; width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--teal);
+}
+.grupo-hoy.llegan .titulo-ocupadas   { color: var(--tinta); }
+.grupo-hoy.sevan .titulo-ocupadas    { color: var(--tinta-2); }
+.grupo-hoy.sevan .titulo-ocupadas::before    { background: var(--teal-claro); }
 .grupo-hoy.sequedan .titulo-ocupadas { color: var(--tinta-3); }
-/* La primera fila de cada caja no lleva su línea de arriba: ya la hace el borde
-   de la propia caja. */
+.grupo-hoy.sequedan .titulo-ocupadas::before { background: var(--apagado); }
 .grupo-hoy .fila-reserva:first-of-type { padding-top: 0; }
 .pie-hoy {
-  margin: calc(var(--e4) * -1 + var(--e1)) var(--e1) var(--e5);
+  margin: calc(var(--e2) * -1) var(--e1) var(--e5);
   font-size: 12.5px; color: var(--tinta-3);
 }
 /* Se despliega hacia abajo, no en ventana: esta sección se consulta de pasada y
    una ventana que hay que cerrar para seguir mirando estorba. */
 .fila-reserva .flecha { transition: transform .18s ease; }
 .fila-reserva.abierta { border-bottom: none; }
-.fila-reserva.abierta .flecha { transform: rotate(90deg); color: var(--timbre); }
-/* Sin fondo propio: es la continuación de la fila, no otra tarjeta. Pintarlo
-   más claro lo convertía en el elemento más destacado de la pantalla, y solo es
-   el detalle de una línea. Lo que lo agrupa es el filete de la izquierda. */
+.fila-reserva.abierta .flecha { transform: rotate(90deg); color: var(--teal); }
+/* La huella del detalle: la misma piel pálida del acento, no una tarjeta
+   nueva encima de otra. */
 .detalle-hoy {
-  background: var(--hoja);
-  padding: var(--e2) var(--e2) var(--e3) var(--e3);
-  margin: 0 0 var(--e3) var(--e1);
-  border-left: 1px solid var(--raya-fuerte);
+  background: var(--teal-piel);
+  padding: var(--e3);
+  margin: 0 0 var(--e3);
+  border-radius: var(--r-campo);
   animation: despliega .18s ease;
 }
-.detalle-hoy .linea-detalle:last-of-type { border-bottom: none; }
+.detalle-hoy .linea-detalle { border-top-color: color-mix(in srgb, var(--teal) 18%, transparent); }
+.detalle-hoy .linea-detalle:first-child { border-top: none; }
 @keyframes despliega { from { opacity: 0; transform: translateY(-6px) } }
-/* Discreto: es una acción secundaria dentro de un detalle, no la de la
-   pantalla. Relleno sólido lo volvía lo más llamativo de todo. */
 .editar-hoy {
-  background: transparent; color: var(--timbre);
-  border: 1px solid color-mix(in srgb, var(--timbre) 40%, transparent);
-  border-radius: var(--radio-chico); min-height: 34px; padding: 0 var(--e4);
+  background: transparent; color: var(--teal);
+  border: 1px solid color-mix(in srgb, var(--teal) 40%, transparent);
+  border-radius: 999px; min-height: 34px; height: 34px; padding: 0 var(--e4);
   font-size: 12.5px; margin-top: var(--e2);
 }
 
-/* ── Fila de la lista del mes ─────────────────────────────────────────────── */
+/* ── Fila de la lista de "Hoy" ────────────────────────────────────────────── */
 .fila-reserva {
   display: flex; align-items: center; justify-content: space-between; gap: var(--e3);
   width: 100%; text-align: left; background: transparent; color: var(--tinta);
-  border-bottom: 1px solid var(--raya); border-radius: 0;
+  border-bottom: 1px solid var(--borde-suave); border-radius: 0;
   padding: var(--e3) var(--e1); font-weight: 500; min-height: 0; line-height: 1.45;
 }
 .fila-reserva:last-child { border-bottom: none; }
-.fila-reserva:hover      { background: var(--hoja-2); }
+.fila-reserva:hover      { background: var(--hoja-2); border-radius: var(--r-campo); }
 .fila-reserva .flecha    { flex: none; color: var(--tinta-3); font-size: 22px; line-height: 1; }
-/* Dos reservas seguidas en la misma cabaña: una línea fina las separa. */
 .ocupada .sub + .sub.fechas + .sub { margin-top: var(--e2); }
 
 /* ── Ventana emergente ────────────────────────────────────────────────────── */
@@ -509,9 +446,9 @@ button.mas span { font-size: 18px; font-weight: 700; line-height: 1; margin-top:
    no al centro de la pantalla. */
 .modal {
   position: fixed; inset: 0;
-  /* Por encima de la barra de pestañas (70). Estaba en 40, y la barra se
-     pintaba sobre la hoja tapándole los últimos 62 px: justo donde vive el
-     botón que cierra la acción. Una reserva no se podía confirmar. */
+  /* Por encima de `nav.tabs` (70): la barra vive colgada del body y, si la
+     hoja quedara por debajo, le comería los últimos 62px — justo donde vive
+     el botón que cierra la acción. */
   z-index: 80;
   background: var(--velo);
   backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
@@ -519,321 +456,291 @@ button.mas span { font-size: 18px; font-weight: 700; line-height: 1; margin-top:
   animation: velo .18s ease;
 }
 @keyframes velo { from { opacity: 0 } }
-/* Entra desde abajo y se materializa: el desenfoque y la escala se mueven junto
-   con el desplazamiento, así la hoja llega como un material y no como una
-   opacidad que sube. */
 @keyframes sube {
   from { transform: translateY(22px) scale(.99); opacity: 0; filter: blur(2px); }
 }
-
-/* La salida es el camino de entrada al revés, con la curva espejada: si algo se
-   va por otro lado del que vino, se pierde de dónde estaba. Es más rápida que
-   la entrada porque al cerrar ya se decidió y esperar molesta. */
 @keyframes baja {
   to { transform: translateY(22px) scale(.99); opacity: 0; filter: blur(2px); }
 }
 @keyframes velo-fuera { to { opacity: 0 } }
-.modal.cerrando            { animation: velo-fuera .18s ease forwards; }
+.modal.cerrando             { animation: velo-fuera .18s ease forwards; }
 .modal.cerrando .modal-caja { animation: baja .18s cubic-bezier(.64, 0, .78, 0) forwards; }
 
 .modal-caja {
   width: 100%; max-width: 560px;
   max-height: 92vh; display: flex; flex-direction: column;
   background: var(--hoja);
-  border: 1px solid var(--raya-fuerte);
-  border-radius: var(--radio) var(--radio) 0 0;
+  border-radius: var(--r-hoja) var(--r-hoja) 0 0;
   box-shadow: var(--sombra-hoja);
   animation: sube .22s cubic-bezier(.22, 1, .36, 1);
   padding-bottom: env(safe-area-inset-bottom);
 }
 @media (min-width: 620px) {
   .modal { align-items: center; }
-  .modal-caja { border-radius: var(--radio); }
+  .modal-caja { border-radius: var(--r-tarjeta); }
 }
 
 .modal-cabecera {
   display: flex; align-items: flex-start; gap: var(--e3);
   padding: var(--e4) var(--e4) var(--e3);
-  border-bottom: 1px solid var(--raya);
 }
-.modal-cabecera h3 { font-size: 17px; font-weight: 600; }
-.modal-cabecera p  { font-size: 12.5px; color: var(--tinta-3); margin-top: 2px; }
+.modal-cabecera h3 { font: 700 20px/1.2 var(--fuente-titulo); letter-spacing: -.01em; }
+.modal-cabecera p  { font-size: 13.5px; color: var(--tinta-3); margin-top: 2px; }
 .cerrar {
-  background: transparent; color: var(--tinta-2); border: 1px solid var(--raya);
-  min-height: 34px; width: 34px; padding: 0; font-size: 20px; line-height: 1;
+  background: var(--hoja-2); color: var(--tinta-2); border: 0;
+  min-height: 36px; height: 36px; width: 36px; padding: 0; font-size: 18px; line-height: 1;
   border-radius: 50%; flex-shrink: 0;
 }
 /* `overscroll-behavior: contain`: al llegar al final de la hoja, el gesto se
    acaba ahí y no continúa desplazando la página de detrás. */
-.modal-cuerpo { padding: var(--e4); overflow-y: auto; overscroll-behavior: contain; }
+.modal-cuerpo { padding: 4px var(--e4) var(--e5); overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: var(--e3); }
+.modal-cuerpo > * { flex: none; }
 
 /* Opción de cabaña dentro de la ventana: toda la fila es tocable. */
 .opcion-cabana {
   width: 100%; text-align: left; background: var(--hoja-2);
-  border: 1px solid var(--raya-fuerte); color: var(--tinta);
-  border-radius: var(--radio-chico); padding: var(--e3) var(--e4);
+  border: 0; color: var(--tinta);
+  border-radius: var(--r-campo); padding: var(--e3) var(--e4);
   margin-bottom: var(--e2); min-height: 62px;
   display: flex; align-items: center; justify-content: space-between; gap: var(--e3);
   font-weight: 500;
 }
 .opcion-cabana .cap { font-size: 12.5px; color: var(--tinta-3); font-weight: 400; }
-.opcion-cabana .flecha { color: var(--timbre); font-size: 20px; }
+.opcion-cabana .flecha { color: var(--teal); font-size: 20px; }
 
 /* ── Alta por pasos ───────────────────────────────────────────────────────── */
-/* Tres rayas en vez de "Paso 2 de 3": ocupa menos, se lee sin leer, y en un
-   asistente de tres pasos el número exacto no cambia lo que uno hace. */
+/* Tres rayas en vez de "Paso 2 de 3": ocupa menos y se lee sin leer. */
 .pasos { display: flex; gap: 5px; margin-bottom: var(--e4); }
 .pasos span {
-  flex: 1; height: 3px; border-radius: var(--radio-chico); background: var(--raya); /* la regla del paso sí es redonda */
+  flex: 1; height: 4px; border-radius: 999px; background: var(--apagado);
   transition: background .25s ease;
 }
-.pasos span.hecho { background: var(--timbre); }
-/* Recordatorio de lo ya decidido en el último paso: sin él hay que retroceder
-   para comprobar que la cabaña y las fechas son las que uno cree. */
+.pasos span.hecho { background: var(--teal); }
 .resumen-alta {
-  margin-top: var(--e4); padding-top: var(--e2);
-  border-top: 1px solid var(--raya);
+  margin-top: var(--e4); padding-top: var(--e3);
+  border-top: 1px solid var(--borde);
 }
-.resumen-alta .linea-detalle { border-bottom: none; padding: 3px 0; font-size: 12.5px; }
+.resumen-alta .linea-detalle { border-top: none; padding: 3px 0; font-size: 12.5px; }
 
 /* ── Canales de venta ─────────────────────────────────────────────────────── */
 .canales { display: flex; gap: var(--e2); flex-wrap: wrap; }
 .canal {
   flex: 1 1 0; min-width: 74px; min-height: 62px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-  background: var(--hoja-2); border: 1px solid var(--raya-fuerte);
-  border-radius: var(--radio-chico); color: var(--tinta-2);
+  background: var(--hoja-2); border: 0;
+  border-radius: var(--r-campo); color: var(--tinta-2);
   font-size: 11px; font-weight: 600; padding: var(--e2) 4px;
 }
-/* El icono va dentro de su insignia de color, no suelto: los SVG de los canales
-   son blancos —están hechos para ir sobre el color de cada marca— y sobre un
-   chip claro desaparecían. De paso, el chip enseña el color real del canal. */
-.canal .insignia { width: 26px; height: 26px; margin: 0; vertical-align: 0; border-radius: 8px; }
+.canal .insignia { width: 26px; height: 26px; margin: 0; vertical-align: 0; border-radius: 9px; }
 .canal .insignia svg { width: 16px; height: 16px; }
 .canal[aria-pressed="true"] {
-  border-color: var(--timbre); background: var(--hoja);
-  color: var(--tinta); box-shadow: inset 0 0 0 1px var(--timbre);
+  background: var(--hoja); color: var(--tinta);
+  box-shadow: inset 0 0 0 2px var(--teal);
 }
 
-/* Insignia del canal en la lista. El color hace el trabajo: se reconoce de un
-   vistazo sin leer, que es el punto de tener logo y no texto. */
+/* La insignia del canal LLEVA EL LOGO, no un punto de color.
+   Un rediseño intermedio la cambió por una píldora con un punto: se perdía de
+   un vistazo por dónde entró cada reserva, que es justo para lo que existe el
+   canal. El diseño aprobado dibuja el logo en blanco sobre el color de la
+   marca — mira el bloque "Por dónde entró" de la lámina de Finanzas. */
 .insignia {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; border-radius: 6px; vertical-align: -5px; margin-right: 5px;
+  width: 22px; height: 22px; border-radius: 8px; flex: none;
+  background: var(--tinta-3); color: #fff;
+  vertical-align: -6px; margin-right: 6px;
 }
-.insignia svg { width: 13px; height: 13px; }
-.insignia.whatsapp  { background: #25D366; }
+.insignia svg { display: block; width: 13px; height: 13px; }
+.insignia.whatsapp  { background: var(--whatsapp); }
 .insignia.instagram { background: linear-gradient(45deg, #F9CE34, #EE2A7B 55%, #6228D7); }
-.insignia.airbnb    { background: #FF5A5F; }
-.insignia.directo   { background: var(--timbre); }
-/* El azul de Mercado Pago, que es por donde llegan hoy todas las de la web:
-   se reconoce de un vistazo entre las demas insignias sin tener que leerla. */
-.insignia.web       { background: #00A5E5; }
+.insignia.airbnb    { background: var(--airbnb); }
+.insignia.directo   { background: var(--teal); }
+.insignia.web       { background: var(--web); }
 .insignia.otro      { background: var(--tinta-3); }
 
-/* Reserva que entro por la web y todavia no esta pagada. Ambar, no rojo: no
-   es un error, es un aviso de que esa fecha aun no esta vendida y puede
-   soltarse sola. Va junto al nombre porque es ahi donde se decide si contar
-   con ella o no. */
+/* En Finanzas la insignia es la pieza que ordena la fila, y ahí el diseño la
+   sube a 38 px con el radio de una tarjeta pequeña. */
+.canal-cab .insignia { width: 38px; height: 38px; border-radius: 12px; margin-right: 12px; vertical-align: middle; }
+.canal-cab .insignia svg { width: 20px; height: 20px; }
+
+/* Reserva que entró por la web y todavía no está pagada. Misma lógica que
+   `.estado`: la piel del acento mientras algo sigue pendiente. */
 .etiqueta-pendiente {
   display: inline-block;
-  padding: 1px 7px;
+  padding: 2px 9px;
   border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.6;
+  font: 700 10.5px/1.6 var(--fuente);
+  letter-spacing: .02em;
   white-space: nowrap;
   vertical-align: 1px;
-  color: #7a4b00;
-  background: #ffe8b8;
-  border: 1px solid #e8bf72;
+  color: var(--teal);
+  background: var(--teal-piel);
 }
 
 /* ── Pagos ────────────────────────────────────────────────────────────────── */
 /* Se cobra en dos mitades. La caja se llena hasta la mitad con el anticipo y se
-   completa con el saldo, y el color se MANTIENE — no parpadea. Un parpadeo
-   significa "esto necesita algo de ti ahora"; un pago recibido no necesita
-   nada, solo tiene que verse de un vistazo. */
+   completa con el saldo, y el color se MANTIENE — no parpadea. */
 .barra-pagos {
-  display: flex; gap: 2px; margin-bottom: var(--e3);
-  border-radius: var(--radio-chico); overflow: hidden;
-  border: 1px solid var(--raya);
+  display: flex; gap: 3px; margin-bottom: var(--e3);
+  border-radius: var(--r-campo); overflow: hidden;
 }
 .barra-pagos .mitad {
   flex: 1; padding: var(--e2) var(--e3); min-width: 0;
-  background: var(--hoja); transition: background .35s ease, color .35s ease;
+  background: var(--hoja-2); transition: background .35s ease, color .35s ease;
 }
 .barra-pagos .mitad.pagada {
-  background: var(--timbre-palido);
-  box-shadow: inset 0 0 0 1px var(--timbre-claro);
+  background: var(--teal-piel);
 }
 .barra-pagos .etiqueta {
-  display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em;
-  color: var(--tinta-3); font-weight: 700;
+  display: block; font: 800 10.5px/1 var(--fuente); text-transform: uppercase; letter-spacing: .1em;
+  color: var(--tinta-3);
 }
-.barra-pagos .mitad.pagada .etiqueta { color: var(--timbre); }
-.barra-pagos .valor { font-size: 14px; font-weight: 600; color: var(--tinta-3); }
+.barra-pagos .mitad.pagada .etiqueta { color: var(--teal); }
+.barra-pagos .valor { font: 600 14px/1 var(--fuente); color: var(--tinta-3); margin-top: 2px; display: block; }
 .barra-pagos .mitad.pagada .valor { color: var(--tinta); }
 .pagado-todo {
-  margin: calc(var(--e3) * -1 + 2px) 0 var(--e3);
-  font-size: 12.5px; color: var(--timbre); font-weight: 600;
+  margin: 0 0 var(--e3);
+  font: 700 12.5px/1 var(--fuente); color: var(--teal);
   text-transform: uppercase; letter-spacing: .1em;
 }
 
 .pago-fila {
   display: flex; align-items: center; justify-content: space-between; gap: var(--e2);
-  padding: var(--e2) 0; border-bottom: 1px solid var(--raya);
+  padding: var(--e2) 0; border-bottom: 1px solid var(--borde-suave);
 }
 .pago-fila:last-child { border-bottom: none; }
 .pago-quien b    { display: block; font-size: 13px; }
 .pago-quien span { font-size: 12px; color: var(--tinta-3); }
 .pago-acciones   { display: flex; gap: var(--e2); flex: none; }
+/* El chip, tal cual `base.css`: 34px, píldora, piel del acento cuando marca. */
 .chip {
-  min-height: 30px; padding: 0 var(--e3); border-radius: var(--radio-chico); font-size: 12px;
-  background: transparent; color: var(--timbre);
-  border: 1px solid color-mix(in srgb, var(--timbre) 40%, transparent);
+  height: 34px; min-height: 34px; padding: 0 var(--e3); border-radius: 999px; font: 600 12.5px/1 var(--fuente);
+  background: var(--hoja-2); color: var(--tinta);
 }
-.chip.marcar { background: var(--timbre); color: var(--tinta-sobre-teal); border-color: var(--timbre); }
-.chip.suave  { color: var(--tinta-3); border-color: var(--raya-fuerte); }
+.chip.marcar { background: var(--teal); color: var(--hoja); }
+.chip.suave  { color: var(--tinta-3); background: transparent; box-shadow: inset 0 0 0 1px var(--borde); }
 
 .comprobante {
-  width: 100%; border-radius: var(--radio-chico); display: block;
-  background: var(--hoja); border: 1px solid var(--raya);
+  width: 100%; border-radius: var(--r-campo); display: block;
+  background: var(--hoja-2);
 }
 
 /* La misma lectura en las listas, sin ocupar una línea: la fila se rellena de
-   izquierda a derecha, media o entera.
-
-   Los selectores van ACOTADOS a las filas de lista. Sueltos, `[data-pagos]`
-   alcanzaba también a las barras de la línea de tiempo y les pintaba encima un
-   lavado que peleaba con su propio relleno. */
+   izquierda a derecha, media o entera. Acotado a `.fila-reserva`: suelto,
+   `[data-pagos]` alcanza también a `.tl-barra` y le pinta encima un lavado que
+   pelea con su propio relleno. */
 .fila-reserva[data-pagos="1"], .fila-reserva[data-pagos="2"] { background-repeat: no-repeat; }
 .fila-reserva[data-pagos="1"] {
   background-image: linear-gradient(90deg,
-    color-mix(in srgb, var(--timbre-palido) 60%, transparent),
-    color-mix(in srgb, var(--timbre-palido) 15%, transparent));
+    color-mix(in srgb, var(--teal-piel) 70%, transparent),
+    color-mix(in srgb, var(--teal-piel) 15%, transparent));
   background-size: 50% 100%;
 }
 .fila-reserva[data-pagos="2"] {
   background-image: linear-gradient(90deg,
-    color-mix(in srgb, var(--timbre-palido) 70%, transparent),
-    color-mix(in srgb, var(--timbre-palido) 30%, transparent));
+    color-mix(in srgb, var(--teal-piel) 80%, transparent),
+    color-mix(in srgb, var(--teal-piel) 35%, transparent));
   background-size: 100% 100%;
 }
 
 /* ── Aseos ────────────────────────────────────────────────────────────────── */
-/* En esta vista las reservas NO son el tema: solo sitúan. Van en gris, sin el
+/* En esta vista las reservas NO son el tema: solo sitúan. Van apagadas, sin el
    código de pagos, para que lo único con color sea el aseo. */
 .tl-barra.gris {
-  background: var(--ocupado); color: var(--ocupado-tx);
-  border-color: var(--raya-fuerte); font-weight: 500;
+  background: var(--hoja-2); color: var(--tinta-2);
+  border-color: var(--borde); font-weight: 500;
   cursor: default;
 }
 .tl-barra.gris:active { transform: none; }
 
-/* Dos niveles, y solo dos. El día con aseo va perfilado; el que además tiene
-   entrada ese mismo día va lleno, porque es el único que no se puede correr. */
+/* Dos niveles, y solo dos: el día con aseo lleva la escoba en anillo; el que
+   además tiene entrada ese mismo día va relleno, porque es el único que no se
+   puede correr. */
 .aseo-marca {
   grid-row: 1; align-self: center; justify-self: center;
-  width: 23px; height: 23px; border-radius: 50%; z-index: 2;
-  border: 2px solid var(--timbre); background: var(--hoja);
+  width: 24px; height: 24px; border-radius: 50%; z-index: 2;
+  background: var(--hoja); box-shadow: inset 0 0 0 2px var(--teal);
   display: flex; align-items: center; justify-content: center;
-  color: var(--timbre);
+  color: var(--teal);
 }
-.aseo-marca svg { width: 14px; height: 14px; display: block; }
+.aseo-marca svg { width: 13px; height: 13px; display: block; }
 .aseo-marca.doble {
-  background: var(--timbre); color: var(--tinta-sobre-teal);
-  box-shadow: 0 0 0 3px var(--timbre-palido);
+  background: var(--teal); color: var(--hoja); box-shadow: none;
 }
-.tl-dia.aseo-hay .tl-num   { color: var(--timbre); }
-.tl-dia.aseo-doble         { background: var(--timbre-palido); border-radius: var(--radio-chico); }
+.tl-dia.aseo-hay .tl-num   { color: var(--teal); }
+.tl-dia.aseo-doble         { background: var(--teal-piel); border-radius: 12px; }
 .tl-dia.aseo-doble .tl-num,
-.tl-dia.aseo-doble .tl-dow { color: var(--timbre); font-weight: 700; }
+.tl-dia.aseo-doble .tl-dow { color: var(--teal); font-weight: 700; }
 
-/* La muestra es la marca real en chico, con su escoba: si la leyenda se dibuja
-   con otro elemento, tarde o temprano dice una cosa y la marca otra. */
 .tl-leyenda i.aseo-m {
   width: 18px; height: 18px; border-radius: 50%; flex: none;
-  border: 2px solid var(--timbre); background: var(--hoja); color: var(--timbre);
+  background: var(--hoja); box-shadow: inset 0 0 0 2px var(--teal); color: var(--teal);
   display: inline-flex; align-items: center; justify-content: center;
   vertical-align: -5px; margin-right: 5px;
 }
 .tl-leyenda i.aseo-m svg { width: 9px; height: 9px; display: block; }
-.tl-leyenda i.aseo-m.doble { background: var(--timbre); color: var(--tinta-sobre-teal); }
+.tl-leyenda i.aseo-m.doble { background: var(--teal); color: var(--hoja); box-shadow: none; }
 
-/* El día con salida Y entrada es el único que no admite postergarse, así que es
-   el único que se marca. Marcar todos sería no marcar ninguno. */
-.aseo-dia.urgente { border-left: 3px solid var(--timbre); }
+/* El día con salida Y entrada es el único que no admite postergarse. */
+.aseo-dia.urgente { box-shadow: inset 3px 0 0 var(--teal); }
 .aseo-cabecera {
   display: flex; align-items: center; justify-content: space-between; gap: var(--e2);
   margin-bottom: var(--e3); font-size: 14px;
 }
-/* La condición, no una alarma: mismo acento que todo lo demás, en versalitas
-   como el resto de los rótulos del libro. */
+/* La condición, no una alarma: mismo acento que todo lo demás. */
 .aseo-aviso {
-  text-transform: uppercase; letter-spacing: .09em; font-size: 11px; font-weight: 700;
-  color: var(--timbre);
+  text-transform: uppercase; letter-spacing: .09em; font: 700 11px/1.4 var(--fuente);
+  color: var(--teal);
+  margin-top: var(--e2); padding: 6px var(--e3);
+  background: var(--teal-piel); border-radius: 999px;
+  display: inline-block;
 }
 .aseo-linea {
-  padding: var(--e2) 0; border-top: 1px solid var(--raya);
+  padding: var(--e2) 0; border-top: 1px solid var(--borde-suave);
 }
-/* Hijo directo: sin el `>`, la regla alcanzaba también al `<b>` de dentro del
-   aviso y le partía la frase en tres líneas. */
-/* El número manda y el nombre queda de apoyo: quien limpia las conoce por
-   número, y el nombre solo sirve para no dudar de cuál se trata. */
 .aseo-linea > b   { display: inline; font-size: 14px; }
 .aseo-cab         { font-size: 12px; color: var(--tinta-3); margin-left: 6px; }
 .aseo-mov         { display: block; font-size: 12.5px; color: var(--tinta-2); margin-top: 2px; }
-.aseo-aviso {
-  margin-top: var(--e2); padding: 5px var(--e3);
-  background: var(--timbre-palido); border-radius: var(--radio-chico);
-  display: inline-block; line-height: 1.4;
-}
 
 /* ── Finanzas ─────────────────────────────────────────────────────────────── */
 /* Dos cifras que casi todos los paneles mezclan en una: lo que YA está en la
-   cuenta y lo que falta cobrar. Se muestran juntas y separadas a la vez. */
+   cuenta y lo que falta cobrar. */
 .cifra-mes {
-  font-size: 34px; font-weight: 700; letter-spacing: -.03em; line-height: 1.05;
+  font: 700 32px/1.05 var(--fuente); letter-spacing: -.02em;
   font-variant-numeric: tabular-nums; color: var(--tinta);
 }
 .cifra-pie { font-size: 12.5px; color: var(--tinta-3); margin-top: 2px; }
 
 .barra-plata {
-  display: flex; height: 14px; margin: var(--e4) 0 var(--e3);
-  border-radius: 3px; overflow: hidden;
-  border: 1px solid var(--timbre-claro);
+  display: flex; height: 10px; margin: var(--e3) 0;
+  border-radius: 999px; overflow: hidden;
+  background: var(--hoja-2);
 }
 .barra-plata .parte { transition: width .35s ease; }
-.barra-plata .cobrado { background: var(--timbre); }
+.barra-plata .cobrado { background: var(--teal); }
 /* Rayado, no un color más: lo pendiente no es otra categoría de plata, es la
-   misma sin llegar todavía. La trama lo dice sin inventar un segundo acento. */
+   misma sin llegar todavía. */
 .barra-plata .pendiente {
   background: repeating-linear-gradient(45deg,
-    var(--timbre-palido) 0 4px, var(--hoja) 4px 8px);
+    var(--teal-piel) 0 4px, var(--hoja) 4px 8px);
 }
 .linea-detalle .pt {
-  display: inline-block; width: 10px; height: 10px; border-radius: 2px;
-  margin-right: 6px; vertical-align: -1px; border: 1px solid var(--timbre-claro);
+  display: inline-block; width: 10px; height: 10px; border-radius: 3px;
+  margin-right: 6px; vertical-align: -1px;
 }
-.linea-detalle .pt.cobrado   { background: var(--timbre); }
+.linea-detalle .pt.cobrado   { background: var(--teal); }
 .linea-detalle .pt.pendiente {
   background: repeating-linear-gradient(45deg,
-    var(--timbre-palido) 0 3px, var(--hoja) 3px 6px);
+    var(--teal-piel) 0 3px, var(--hoja) 3px 6px);
+  box-shadow: inset 0 0 0 1px var(--teal-medio);
 }
 
-/* Los turnos van listados, no solo contados: "3 turnos" no deja comprobar
-   nada, y la pregunta que sigue a la cifra es siempre cuáles fueron. */
-.turnos-tinaja { margin-top: var(--e4); border-top: 1px solid var(--raya); }
+/* Los turnos van listados, no solo contados. */
+.turnos-tinaja { margin-top: var(--e4); border-top: 1px solid var(--borde); }
 .turnos-tinaja .linea-detalle span:last-child { color: var(--tinta-3); }
 
 /* ── Gráfico del año ──────────────────────────────────────────────────────── */
-/* Una cifra sola no dice si el mes fue bueno; al lado de los otros once, sí.
-   Por eso el resumen es el gráfico y la ficha va debajo, no al revés. */
 .gr {
   --gr-alto: 10.5rem; --gr-ancho-col: 52px;
-  /* Curva sin rebote: es un dato cambiando de valor, no algo que se lanzó.
-     El rebote se gana con un gesto que traía impulso, y aquí no hay ninguno. */
   --gr-t: .34s;
   --gr-curva: cubic-bezier(.22, 1, .36, 1);
 }
@@ -842,28 +749,23 @@ button.mas span { font-size: 18px; font-weight: 700; line-height: 1; margin-top:
   font-size: 12px; color: var(--tinta-3);
   margin-bottom: var(--e2);
 }
-
-/* La pista se arrastra en horizontal: doce meses no caben en un teléfono y
-   comprimirlos hasta que quepan deja barras que no se distinguen. */
 .gr-pista {
   overflow-x: auto; overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x proximity;
   scrollbar-width: none;
-  margin-inline: calc(-1 * var(--e3));   /* sangra hasta el borde de la tarjeta */
+  margin-inline: calc(-1 * var(--e3));
   padding-inline: var(--e3);
 }
 .gr-pista::-webkit-scrollbar { display: none; }
 
 .gr-lienzo { position: relative; width: max-content; min-width: 100%; }
-/* Rejilla de fondo: solo tres líneas. Con más, el gráfico se lee como una
-   tabla y deja de leerse como una silueta. */
 .gr-rejilla {
   position: absolute; left: 0; right: 0; top: 0; height: var(--gr-alto);
   background:
-    linear-gradient(var(--raya), var(--raya)) no-repeat 0 0    / 100% 1px,
-    linear-gradient(var(--raya), var(--raya)) no-repeat 0 50%  / 100% 1px,
-    linear-gradient(var(--raya), var(--raya)) no-repeat 0 100% / 100% 1px;
+    linear-gradient(var(--borde), var(--borde)) no-repeat 0 0    / 100% 1px,
+    linear-gradient(var(--borde), var(--borde)) no-repeat 0 50%  / 100% 1px,
+    linear-gradient(var(--borde), var(--borde)) no-repeat 0 100% / 100% 1px;
 }
 
 .gr-cols { position: relative; display: flex; gap: 6px; }
@@ -873,29 +775,24 @@ button.mas span { font-size: 18px; font-weight: 700; line-height: 1; margin-top:
   background: none; border: 0; padding: 0; cursor: pointer;
   scroll-snap-align: center;
   -webkit-tap-highlight-color: transparent;
+  height: auto; min-height: 0;
 }
-/* La barra crece desde abajo: el suelo es el cero y no se mueve. */
 .gr-barra {
   width: 100%; height: var(--gr-alto);
   display: flex; flex-direction: column; justify-content: flex-end;
 }
 .gr-cuerpo {
   position: relative; width: 100%;
-  background: linear-gradient(var(--timbre-lavado), var(--timbre));
-  border-radius: 5px 5px 0 0;
+  background: linear-gradient(var(--teal-claro), var(--teal));
+  border-radius: 8px 8px 0 0;
   transition: height var(--gr-t) var(--gr-curva);
 }
-/* Lo que falta cobrar va SIEMPRE dibujado, en su sitio y con su altura; solo
-   está transparente hasta que el mes se elige. Por eso cambiar de mes no
-   reconstruye la barra: se revela un recorte que ya estaba ahí, y la altura
-   total no se mueve ni un píxel. */
 .gr-pend {
   position: absolute; left: 0; right: 0; top: 0;
   box-sizing: border-box;
-  border: 1px solid var(--timbre); border-bottom: 0;
-  border-radius: 5px 5px 0 0;
+  border-radius: 8px 8px 0 0;
   background: repeating-linear-gradient(45deg,
-    var(--timbre-palido) 0 4px, var(--hoja) 4px 8px);
+    var(--teal-piel) 0 4px, var(--hoja) 4px 8px);
   opacity: 0;
   transition: opacity var(--gr-t) var(--gr-curva),
               height  var(--gr-t) var(--gr-curva);
@@ -910,28 +807,20 @@ button.mas span { font-size: 18px; font-weight: 700; line-height: 1; margin-top:
               transform  .12s ease-out;
 }
 .gr-col.es .gr-mes { background: var(--tinta); color: var(--hoja); font-weight: 600; }
-/* Al pulsar, no al soltar: el retardo entre el dedo y la respuesta es lo que
-   hace que una interfaz deje de sentirse directa. */
 .gr-col:active .gr-mes { transform: scale(.93); }
 .gr-col:active .gr-cuerpo { opacity: .72; }
 
-/* La ficha son cifras distintas, no las mismas movidas: se reemplaza y entra
-   desde abajo, en el mismo tiempo que tarda la barra en revelarse. */
 .gr-ficha {
-  margin-top: var(--e4); padding-top: var(--e3); border-top: 1px solid var(--raya);
+  margin-top: var(--e4); padding-top: var(--e3); border-top: 1px solid var(--borde);
   animation: gr-entra var(--gr-t) var(--gr-curva) both;
 }
 @keyframes gr-entra { from { opacity: 0; transform: translateY(7px); } }
 .gr-ficha h3 {
-  font-family: var(--fuente-titulo); font-size: 17px; font-weight: 700;
-  letter-spacing: -.01em; margin: 0 0 var(--e2);
+  font: 700 17px/1.2 var(--fuente-titulo); letter-spacing: -.01em; margin: 0 0 var(--e2);
 }
 .gr-ficha .gr-total b { font-size: 16px; }
 .gr-ficha .cifra-pie { margin-top: var(--e2); }
 
-/* Con movimiento reducido se quitan los desplazamientos, no el aviso: la
-   píldora y la trama siguen cambiando, solo que de golpe. Apagar también el
-   cambio de estado dejaría al usuario sin saber qué mes está mirando. */
 @media (prefers-reduced-motion: reduce) {
   .gr-mes, .gr-cuerpo, .gr-pend { transition: none; }
   .gr-ficha { animation: none; }
@@ -940,20 +829,20 @@ button.mas span { font-size: 18px; font-weight: 700; line-height: 1; margin-top:
 
 /* ── Pellet ───────────────────────────────────────────────────────────────── */
 .pellet-cifra { text-align: center; margin-top: var(--e3); }
-.pellet-fila  { padding: var(--e3) 0; border-bottom: 1px solid var(--raya); }
+.pellet-fila  { padding: var(--e3) 0; border-bottom: 1px solid var(--borde-suave); }
 .pellet-fila:last-child { border-bottom: none; }
 .pellet-cab {
   display: flex; align-items: center; justify-content: space-between; gap: var(--e2);
   font-size: 13.5px; margin-bottom: var(--e2);
 }
 .pellet-host {
-  font-size: 10px; text-transform: uppercase; letter-spacing: .08em;
-  color: var(--tinta-3); font-weight: 600;
+  font: 600 10px/1 var(--fuente); text-transform: uppercase; letter-spacing: .08em;
+  color: var(--tinta-3);
 }
-.pellet-barra { height: 8px; background: var(--hoja-2); border-radius: 2px; overflow: hidden; }
-.pellet-barra span { display: block; height: 100%; background: var(--timbre); }
+.pellet-barra { height: 10px; background: var(--hoja-2); border-radius: 999px; overflow: hidden; }
+.pellet-barra span { display: block; height: 100%; background: var(--teal); }
 
-.canal-fila { padding: var(--e3) 0; border-bottom: 1px solid var(--raya); }
+.canal-fila { padding: var(--e3) 0; border-bottom: 1px solid var(--borde-suave); }
 .canal-fila:last-child { border-bottom: none; }
 .canal-cab {
   display: flex; align-items: center; justify-content: space-between; gap: var(--e2);
@@ -963,178 +852,168 @@ button.mas span { font-size: 18px; font-weight: 700; line-height: 1; margin-top:
 .canal-fila .barra-plata { height: 10px; margin: var(--e2) 0 0; }
 
 /* ── Mensajes ─────────────────────────────────────────────────────────────── */
+/* El único sitio del panel donde hace falta más de un color: un aviso
+   flotante que se lee en medio segundo no puede depender solo de la letra
+   para decir si algo salió bien o mal. Se compone con lo que ya hay —el
+   acento y su piel para lo resuelto, el peligro para lo que falló, gris para
+   lo neutro— nunca un tono nuevo. */
 .aviso {
-  border-radius: var(--radio-chico); padding: var(--e3);
+  border-radius: var(--r-campo); padding: var(--e3);
   font-size: 13.5px; margin-bottom: var(--e3); line-height: 1.45;
 }
-/* El total no es una alerta: es la cifra anotada. Va como una casilla del libro
-   —fondo de hoja y filete— y no como un campo de color. Pintado de rojo pálido
-   ocupaba media pantalla gritando algo que solo hay que leer. */
-.aviso.ok {
-  background: var(--hoja-2); color: var(--tinta);
-  border: 1px solid var(--raya-fuerte);
-  border-left: 3px solid var(--timbre-claro);
-}
-.aviso.error { background: color-mix(in srgb, var(--error) 12%, transparent); color: var(--error); }
-.aviso.info  { background: var(--hoja-2); color: var(--tinta-2); border: 1px solid var(--raya); }
-/* Ni ok ni error: algo que hay que mirar. El solape de temporadas no es
-   un fallo del panel, es un dato que se contradice. */
-.aviso.alerta { background: color-mix(in srgb, var(--alerta) 12%, transparent); color: var(--alerta); }
+.aviso.ok    { background: var(--teal-piel); color: var(--teal); }
+.aviso.error { background: color-mix(in srgb, var(--peligro) 12%, var(--hoja)); color: var(--peligro); }
+.aviso.info  { background: var(--hoja-2); color: var(--tinta-2); }
+/* Ni ok ni error: algo que hay que mirar, no un fallo del panel. Un solape de
+   temporadas es un dato que se contradice, y sigue siendo "pide algo" — la
+   misma piel del acento que usa `.estado`. */
+.aviso.alerta { background: var(--teal-piel); color: var(--teal); }
+/* Un aviso corto y positivo suelto en un formulario (la tinaja está libre a
+   esa hora): no necesita la caja de `.aviso`, solo la palabra en el acento. */
+.tinaja-ok { color: var(--teal); font-weight: 600; font-size: 13.5px; margin: var(--e2) 0 0; }
 
 /* ── Cotización ───────────────────────────────────────────────────────────── */
-.total { font-family: var(--fuente-titulo); font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+.total { font: 700 30px/1 var(--fuente-titulo); letter-spacing: -.02em; }
 .linea-detalle {
   display: flex; justify-content: space-between; gap: var(--e3);
-  padding: var(--e2) 0; border-top: 1px solid var(--raya); font-size: 13.5px;
+  padding: var(--e2) 0; border-top: 1px solid var(--borde);
+  font-size: 13.5px;
 }
 .linea-detalle:first-child { border-top: none; }
 .linea-detalle b { font-variant-numeric: tabular-nums; }
 
-.lista-vacia { text-align: center; color: var(--tinta-3); font-size: 13.5px; padding: var(--e5) var(--e3); }
+/* Ningún vacío se deja en blanco: siempre dice por qué. Le da el peso de un
+   mensaje leído, no el de un hueco. */
+.lista-vacia { text-align: center; color: var(--tinta-3); font-size: 13.5px; line-height: 1.4; padding: var(--e5) var(--e3); }
 
 /* ── Pestañas ─────────────────────────────────────────────────────────────── */
-/* Abajo, al alcance del pulgar. Es un panel que se usa de pie y con una mano. */
-/* La barra vive ahora al final de este archivo: burbuja, muesca y riel.
-   Las reglas viejas se quitaron en vez de pisarse — el borde superior y la
-   linea del activo peleaban con la muesca, que necesita el canto limpio. */
+/* Se conserva tal cual del panel: burbuja, muesca y riel, más abajo en este
+   mismo archivo. */
 
 /* ── Movimiento reducido ──────────────────────────────────────────────────── */
 /* NO se apaga todo a 0.01s. Ese truco quita el mareo y de paso borra la señal
-   de que algo cambió: una ventana que aparece de golpe, sin nada, se lee como
-   un fallo de la pantalla.
-
-   Lo que marea son los DESPLAZAMIENTOS. Se quitan esos y se dejan fundidos
-   cortos, que informan del cambio sin mover nada por la pantalla. */
+   de que algo cambió. Lo que marea son los DESPLAZAMIENTOS: se quitan esos y
+   se dejan fundidos cortos, que informan del cambio sin mover nada. */
 @media (prefers-reduced-motion: reduce) {
   .modal-caja  { animation: aparece .16s ease; }
   .detalle-hoy { animation: aparece .14s ease; }
   .modal       { animation: aparece .14s ease; }
-  /* La salida también: sin desplazamiento ni desenfoque, solo el fundido. */
   .modal.cerrando,
   .modal.cerrando .modal-caja { animation: velo-fuera .14s ease forwards; }
-  /* La flecha del desplegable gira igual: es un estado, no un adorno, y sin
-     ella no se sabe si la fila está abierta. Solo se acorta. */
   .fila-reserva .flecha { transition-duration: .05s; }
   html { scroll-behavior: auto; }
 }
 @keyframes aparece { from { opacity: 0 } }
 
 /* ── Login ────────────────────────────────────────────────────────────────── */
+/* Entrar es una pantalla más del panel, no un formulario prestado: lleva la
+   misma cabecera de tres niveles que el resto —rótulo, título, subtítulo— y
+   alineada a la izquierda, como todas. */
 .login { max-width: 340px; margin: 12vh auto; padding: var(--e4); }
-.login h1 { font-family: var(--fuente-titulo); font-size: 24px; text-align: center; margin-bottom: var(--e2); color: var(--timbre); }
-.login p.sub { text-align: center; color: var(--tinta-3); font-size: 13px; margin-bottom: var(--e5); }
+.login .cabecera-txt { display: flex; flex-direction: column; gap: 4px; margin-bottom: var(--e5); }
+.login h1, .login .titulo {
+  font: 700 28px/1.05 var(--fuente); letter-spacing: -.02em;
+  color: var(--tinta); text-align: left; margin: 0;
+}
+.login p.sub { text-align: left; color: var(--tinta-2); font: 400 14px/1.2 var(--fuente); margin: 0; }
+
+/* El rótulo en versalitas que encabeza cada pantalla. */
+.marca {
+  display: block;
+  font: 800 10.5px/1 var(--fuente); letter-spacing: .16em;
+  text-transform: uppercase; color: var(--tinta-3);
+}
+
+/* La acción principal de un formulario mide 50, no 46: es la única de la
+   pantalla y el diseño le da ese peso. */
+button.alto, .alto { min-height: 50px; font: 600 15px/1 var(--fuente); }
+
+/* La tarjeta en teal sólido: el estado bueno y la zona encendida. */
+.tarjeta.teal { background: var(--teal); color: var(--hoja); box-shadow: none; }
+.tarjeta.teal .rotulo, .tarjeta.teal .sub { color: rgba(242, 241, 236, .75); }
 
 
-/* == Huespedes ============================================================ */
-/* Todo con los tokens del panel: si cambia --timbre, cambia esto tambien. */
+/* == Huéspedes ============================================================ */
+/* Todo con los tokens del panel: si cambia --teal, cambia esto también. */
 
 .hu-lista { display: flex; flex-direction: column; gap: 10px; }
 
 .hu-card {
   background: var(--hoja);
-  border: 1px solid var(--raya);
-  border-radius: var(--radio);
-  padding: 14px 15px;
-  box-shadow: var(--sombra-hoja);
+  border-radius: var(--r-tarjeta);
+  padding: var(--e4);
+  box-shadow: var(--sombra);
 }
-.hu-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.hu-card-top b { font-size: 15px; color: var(--tinta); }
-.hu-card-sub { font-size: 12px; color: var(--tinta-3); margin-top: 2px; }
+/* La cabecera de la tarjeta: circulo con las iniciales, el nombre con su
+   cabaña debajo, y el estado a la derecha. Es la misma fila que se repite en
+   Llegan pronto, en Atlas y en la bandeja: una sola forma de presentar a una
+   persona en todo el panel. */
+.hu-card-top { display: flex; align-items: center; gap: 12px; }
+.hu-card { display: flex; flex-direction: column; gap: 12px; }
 
-.hu-pill {
-  flex-shrink: 0;
-  font-size: 10px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase;
-  padding: 4px 9px; border-radius: 999px;
-  background: var(--raya); color: var(--tinta-3);
-  white-space: nowrap;
-}
-.hu-pill.ok { background: var(--timbre-palido); color: var(--timbre); }
-
-.hu-card-acciones { display: flex; gap: 8px; margin-top: 12px; }
-/* Tres botones no caben en una fila de telefono sin quedar en dos palabras
-   cortadas cada uno. Envuelven, y el de confirmar ocupa la fila entera: es el
-   que se usa una vez por reserva y el primero que se busca. */
-.hu-card-acciones { flex-wrap: wrap; }
-.hu-btn-wa, .hu-btn-chat, .hu-btn-confirmar {
-  flex: 1; min-height: var(--toque);
-  border-radius: 999px; border: 1px solid var(--raya);
-  font-family: var(--fuente); font-size: 12.5px; font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.12s, background 0.18s;
-}
-.hu-btn-confirmar {
-  flex-basis: 100%;
-  background: var(--timbre); border-color: var(--timbre); color: #fff;
-}
-/* Ya enviada: se apaga pero NO se desactiva. Un boton gris que no responde
-   deja al que lo pulsa sin saber si fallo o si es que ya estaba hecho. */
-.hu-btn-confirmar.hecho {
-  background: transparent; border-color: var(--raya);
-  color: var(--tinta-3); font-weight: 500;
-}
-.hu-btn-wa   { background: #25d366; border-color: #25d366; color: #0b2b16; }
-.hu-btn-chat { background: var(--hoja-2); color: var(--tinta); }
-.hu-btn-wa:active, .hu-btn-chat:active, .hu-btn-confirmar:active { transform: scale(0.97); }
+/* Ya enviada: se apaga pero NO se desactiva. Un WhatsApp se puede no haber
+   ido, y el huésped puede pedir que se lo repitan. */
+.btn.hecho { background: var(--hoja-2); color: var(--tinta-3); font-weight: 500; }
+.btn.primario.hecho { background: var(--hoja-2); color: var(--tinta-3); }
+.btn:active { transform: scale(.97); }
 
 /* -- Solicitudes -- */
-.hu-filtros { display: flex; gap: 7px; margin-bottom: 12px; }
+.hu-filtros { display: flex; gap: 2px; padding: 3px; margin-bottom: 12px; background: var(--hoja-2); border-radius: 999px; }
 .hu-filtros button {
-  border: 1px solid var(--raya); background: var(--hoja);
-  color: var(--tinta-3);
-  border-radius: 999px; padding: 7px 14px; min-height: 36px;
+  flex: 1; border: 0; background: transparent;
+  color: var(--tinta-2);
+  border-radius: 999px; padding: 0 14px; min-height: 32px; height: 32px;
   font-family: var(--fuente); font-size: 12.5px; font-weight: 600;
   cursor: pointer;
 }
 .hu-filtros button[aria-selected="true"] {
-  background: var(--timbre); border-color: var(--timbre); color: var(--tinta-sobre-teal);
+  background: var(--teal); color: var(--hoja);
 }
 
+/* Una tarjeta por solicitud. El lenguaje aprobado no reparte un color por
+   tipo (avería, pellet, tinaja): lo dice la palabra de `.hu-sol-tipo`, no un
+   filete de color — es la misma regla que ya sigue `.estado`. */
 .hu-sol {
   display: flex; align-items: center; gap: 12px;
   background: var(--hoja);
-  border: 1px solid var(--raya);
-  /* La franja de color a la izquierda permite distinguir de un vistazo una
-     averia de un pedido de pellet sin tener que leer. */
-  border-left: 3px solid var(--tinta-3);
-  border-radius: var(--radio-chico);
-  padding: 12px 14px;
+  border-radius: var(--r-tarjeta);
+  box-shadow: var(--sombra);
+  padding: var(--e3) var(--e4);
 }
-.hu-sol.tipo-falla  { border-left-color: var(--error); }
-.hu-sol.tipo-pellet { border-left-color: var(--alerta); }
-.hu-sol.tipo-tinaja { border-left-color: var(--timbre); }
-.hu-sol.hecha { opacity: 0.5; }
+.hu-sol.hecha { opacity: 0.55; box-shadow: none; }
 
 .hu-sol-main { flex: 1; min-width: 0; }
 .hu-sol-head { display: flex; align-items: baseline; gap: 8px; }
-.hu-sol-tipo { font-size: 13px; font-weight: 700; color: var(--tinta); }
+.hu-sol-tipo { font: 600 13px/1 var(--fuente); color: var(--tinta); }
 .hu-sol-hace { font-size: 11px; color: var(--tinta-3); }
 .hu-sol-quien { font-size: 12px; color: var(--tinta-2); margin-top: 2px; }
 .hu-sol-detalle { font-size: 12.5px; color: var(--tinta-2); margin-top: 3px; line-height: 1.45; overflow-wrap: anywhere; }
 
 .hu-sol-btn {
-  flex-shrink: 0; min-height: 38px;
-  border: 1px solid var(--raya); background: var(--hoja-2); color: var(--tinta);
-  border-radius: 999px; padding: 0 13px;
+  flex-shrink: 0; min-height: 38px; height: 38px;
+  border: 0; background: var(--hoja-2); color: var(--tinta);
+  border-radius: 999px; padding: 0 14px;
   font-family: var(--fuente); font-size: 12px; font-weight: 600;
   cursor: pointer;
 }
 .hu-sol-btn:active { transform: scale(0.96); }
-.hu-sol-ok { flex-shrink: 0; font-size: 11.5px; font-weight: 600; color: var(--ok); }
-/* Rechazada. Mismo sitio y mismo peso que "Listo", distinto color: las dos
-   cierran la solicitud, pero una concedio el turno y la otra lo nego. */
-.hu-sol-nok { flex-shrink: 0; font-size: 11.5px; font-weight: 600; color: var(--error); }
+.hu-sol-ok { flex-shrink: 0; font: 700 11.5px/1 var(--fuente); color: var(--teal); }
+/* Rechazada: la única solicitud que se cierra en negativo, y por eso es la
+   única que lleva el color de peligro — sin fondo, solo la palabra, igual
+   que un botón de borrar. */
+.hu-sol-nok { flex-shrink: 0; font: 700 11.5px/1 var(--fuente); color: var(--peligro); }
 
-/* -- Badge de la pestania -- */
+/* -- Badge de la pestaña -- */
 .hu-badge {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 17px; height: 17px; padding: 0 4px; margin-left: 5px;
   border-radius: 999px;
-  background: var(--error); color: #fff;
+  background: var(--peligro); color: #fff;
   font-size: 10px; font-weight: 700; line-height: 1;
   vertical-align: 1px;
 }
 
-/* -- Conversacion dentro del modal -- */
+/* -- Conversación dentro del modal -- */
 .hu-chat {
   display: flex; flex-direction: column; gap: 9px;
   max-height: 46vh; overflow-y: auto;
@@ -1144,100 +1023,122 @@ button.mas span { font-size: 18px; font-weight: 700; line-height: 1; margin-top:
 .hu-msg.host    { align-self: flex-end; align-items: flex-end; }
 .hu-msg.huesped { align-self: flex-start; }
 .hu-msg-txt {
-  padding: 9px 12px; border-radius: 13px;
+  padding: 10px 14px; border-radius: 18px;
   font-size: 13.5px; line-height: 1.45;
   overflow-wrap: anywhere;
 }
-.hu-msg.host .hu-msg-txt    { background: var(--timbre); color: var(--tinta-sobre-teal); border-bottom-right-radius: 4px; }
-.hu-msg.huesped .hu-msg-txt { background: var(--hoja-2); color: var(--tinta); border-bottom-left-radius: 4px; }
-.hu-msg-hora { font-size: 10px; color: var(--tinta-3); padding: 0 3px; }
+.hu-msg.host .hu-msg-txt    { background: var(--teal); color: var(--hoja); border-bottom-right-radius: 6px; }
+.hu-msg.huesped .hu-msg-txt { background: var(--hoja-2); color: var(--tinta); border-bottom-left-radius: 6px; }
+.hu-msg-hora { font-size: 10px; color: var(--tinta-3); padding: 0 4px; }
 
-.hu-chat-bar { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid var(--raya); }
+.hu-chat-bar { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid var(--borde-suave); }
 #hu-chat-input {
   flex: 1; min-width: 0; min-height: var(--toque);
-  border: 1px solid var(--raya); border-radius: 999px;
-  background: var(--hoja); color: var(--tinta);
-  padding: 0 14px;
+  border: 0; border-radius: 999px;
+  background: var(--hoja-2); color: var(--tinta);
+  padding: 0 16px;
   font-family: var(--fuente); font-size: 13.5px;
 }
-#hu-chat-input:focus { outline: none; border-color: var(--timbre); }
+#hu-chat-input:focus { outline: 2px solid var(--teal); outline-offset: 1px; }
 #hu-chat-send {
-  flex-shrink: 0; min-height: var(--toque);
-  border: none; border-radius: 999px;
-  background: var(--timbre); color: var(--tinta-sobre-teal);
-  padding: 0 18px;
+  flex-shrink: 0; min-height: var(--toque); width: var(--toque);
+  border: none; border-radius: 50%;
+  background: var(--teal); color: var(--hoja);
+  padding: 0;
   font-family: var(--fuente); font-size: 12.5px; font-weight: 700;
   cursor: pointer;
 }
 #hu-chat-send:active { transform: scale(0.97); }
 
-/* Aprobar / rechazar un turno de tinaja. Dos acciones opuestas necesitan dos
-   colores distintos: si se parecen, tarde o temprano se pulsa la equivocada. */
-.hu-sol-tinaja { display: flex; flex-direction: column; gap: 5px; flex-shrink: 0; }
+/* Aprobar / rechazar un turno de tinaja: dos acciones opuestas, dos pesos
+   distintos del mismo lenguaje — aprobar es la acción primaria (teal),
+   rechazar es texto suelto como cualquier otra salida negativa. */
+.hu-sol-tinaja { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
 .hu-sol-si, .hu-sol-no {
-  min-height: 34px; padding: 0 13px;
-  border-radius: 999px; cursor: pointer;
+  min-height: 34px; height: 34px; padding: 0 14px;
+  border-radius: 999px; cursor: pointer; border: 0;
   font-family: var(--fuente); font-size: 12px; font-weight: 700;
-  border: 1px solid transparent;
 }
-.hu-sol-si { background: var(--ok); color: #fff; }
-.hu-sol-no { background: transparent; color: var(--tinta-3); border-color: var(--raya-fuerte); }
+.hu-sol-si { background: var(--teal); color: var(--hoja); }
+.hu-sol-no { background: transparent; color: var(--tinta-3); box-shadow: inset 0 0 0 1px var(--borde); }
 .hu-sol-si:active, .hu-sol-no:active { transform: scale(0.96); }
 
 /* == Avisos ================================================================ */
+/* El banner de estado: cuando todo funciona, la tarjeta pasa a teal sólido
+   —tal cual el diseño aprobado de "Avisos" y de "Atlas"—; cuando no, se
+   queda neutra y lo dice con la palabra, nunca con un rojo de alarma. Que un
+   teléfono no reciba avisos, o que eWeLink no esté conectado, no es un
+   fallo del panel: es un estado que se resuelve tocando el botón de al
+   lado. */
 .av-estado {
   display: flex; align-items: center; justify-content: space-between; gap: 14px;
-  background: var(--hoja); border: 1px solid var(--raya);
-  border-left: 3px solid var(--tinta-3);
-  border-radius: var(--radio); padding: 15px 16px;
+  background: var(--hoja);
+  border-radius: var(--r-tarjeta); padding: var(--e4);
+  box-shadow: var(--sombra);
 }
-/* El estado se lee por el color del filo antes que por el texto. */
-.av-estado.activo      { border-left-color: var(--ok); }
-.av-estado.inactivo    { border-left-color: var(--alerta); }
-.av-estado.bloqueado,
-.av-estado.sin-https,
-.av-estado.no-soportado { border-left-color: var(--error); }
+.av-estado.activo {
+  background: var(--teal); color: var(--hoja); box-shadow: none;
+}
+.av-estado.activo .av-sub { color: color-mix(in srgb, var(--hoja) 80%, transparent); }
 .av-estado b { font-size: 15px; }
 .av-sub { display: block; font-size: 12px; color: var(--tinta-3); margin-top: 2px; line-height: 1.45; }
 .av-estado button { flex-shrink: 0; min-height: var(--toque); border-radius: 999px; padding: 0 16px; font-size: 13px; }
+.av-estado.activo button.secundario { background: rgba(242,241,236,.16); color: var(--hoja); }
 
-.av-cats { display: flex; flex-direction: column; gap: 8px; }
+/* Las siete categorías van en UNA tarjeta con separadores, no en siete
+   tarjetas sueltas: es una sola lista de ajustes y así se lee como tal. */
+.av-cats {
+  display: flex; flex-direction: column; gap: 0;
+  background: var(--hoja); border-radius: var(--r-tarjeta);
+  box-shadow: var(--sombra); padding: 4px 18px;
+}
 .av-cat {
   display: flex; align-items: center; justify-content: space-between; gap: 14px;
-  background: var(--hoja); border: 1px solid var(--raya);
-  border-radius: var(--radio-chico); padding: 13px 15px;
+  background: transparent; box-shadow: none; border-radius: 0;
+  padding: 14px 0; border-bottom: 1px solid var(--borde-suave);
   cursor: pointer; min-height: var(--toque);
 }
+.av-cat:last-child { border-bottom: 0; }
 .av-cat b { font-size: 14px; font-weight: 600; }
-/* 44px de verdad: es un interruptor que se toca con el pulgar en movimiento. */
-.av-cat input { width: 44px; height: 26px; flex-shrink: 0; margin: 0; accent-color: var(--timbre); cursor: pointer; }
+/* El interruptor: la misma píldora de 46×26 del diseño aprobado, hecha con un
+   checkbox nativo para no tocar el marcado. */
+.av-cat input {
+  -webkit-appearance: none; appearance: none;
+  width: 46px; height: 28px; min-height: 0; padding: 0; flex-shrink: 0; margin: 0;
+  border-radius: 999px; background: var(--apagado);
+  position: relative; cursor: pointer;
+  transition: background .2s ease;
+}
+.av-cat input::before {
+  content: ""; position: absolute; top: 3px; left: 3px;
+  width: 22px; height: 22px; border-radius: 50%; background: var(--hoja);
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  transition: transform .2s ease;
+}
+.av-cat input:checked { background: var(--teal); }
+.av-cat input:checked::before { transform: translateX(18px); }
 .av-nota { font-size: 12.5px; color: var(--tinta-3); margin-top: 14px; line-height: 1.5; }
 
-/* La foto de una falla, dentro de la tarjeta. Se abre bajo el texto en vez de
-   en una ventana: casi siempre basta un vistazo para saber que pasa. */
+/* La foto de una falla, dentro de la tarjeta. */
 .hu-sol-foto {
   margin-top: 6px; padding: 0;
   background: none; border: none;
-  color: var(--acento, #143D4A);
+  color: var(--teal);
   font: inherit; font-size: 12px; font-weight: 600;
   text-decoration: underline; text-underline-offset: 3px;
   cursor: pointer;
 }
 .hu-foto-vista {
   display: block; width: 100%; max-width: 320px;
-  margin-top: 8px; border-radius: 10px;
+  margin-top: 8px; border-radius: var(--r-campo);
 }
 
 /* ── eWeLink: luces y aparatos ──────────────────────────────────────────────
-   Sin colores nuevos. Todo sale de tokens.css, así que cambiar la identidad
-   del panel sigue siendo tocar un archivo. */
+   Sin colores nuevos: todo sale de tokens.css. */
 /* ── El mapa del complejo ────────────────────────────────────────────────────
    Solo la caja. Todo lo de dentro lleva sus estilos en línea porque viene del
    diseño de Claude Design y se porta tal cual — si algo de ahí se reescribiera
    aquí, habría dos sitios donde mirar cuando el mapa se vea raro. */
-/* De borde a borde. `main` tiene relleno y un ancho máximo —bien para listas y
-   fichas, estorbo para un mapa— así que esto se sale de ahí a lo ancho de la
-   ventana. Cada píxel de margen es terreno que no se ve. */
 .lz-todo {
   width: 100vw;
   margin-left: 50%;
@@ -1246,32 +1147,24 @@ button.mas span { font-size: 18px; font-weight: 700; line-height: 1; margin-top:
 .lz-marco {
   position: relative;
   width: 100%;
-  /* Toda la pantalla menos la barra de pestañas. En Luces la cabecera se
-     esconde (ver abajo): el precio base y el mínimo de noches no ayudan a
-     decidir qué luz encender, y esos 76px son terreno. La proporción no importa
-     aquí — las posiciones se corrigen en `luces.js` contra la del diseño. */
   height: calc(100dvh - var(--toque) - env(safe-area-inset-bottom) - 1px);
   min-height: 380px;
   overflow: hidden;
-  background: var(--papel);
+  background: var(--fondo);
 }
 
-/* En Luces desaparece todo lo que no sea el mapa y las pestañas. Es la única
-   pantalla del panel donde lo de alrededor no aporta nada: no se viene aquí a
-   consultar un precio, se viene a ver el complejo y a tocar una luz.
-   Las pestañas se quedan porque son la forma de salir. */
+/* En Luces desaparece todo lo que no sea el mapa y las pestañas. */
 body.en-luces header { display: none; }
 body.en-luces main   { padding: 0; max-width: none; }
 
-/* Una tarjeta por cabaña. Los botones van ANCHOS y debajo del nombre, no
-   apretados a la derecha: se usa de pie, con una mano y a veces con guantes. */
+/* `.luz-tarjeta` no la emite ningún `pintarX()` de hoy — Luces se pinta
+   entera desde `luces.js` sobre el mapa de `lz-marco` — así que esta regla
+   quedó huérfana del rediseño anterior. Se deja comentada en vez de borrada
+   por si `luces.js` vuelve a necesitarla; ver el informe de esta tanda.
 .luz-tarjeta .luz-cab { margin-bottom: var(--e3); }
 .luz-tarjeta .fila button { flex: 1; }
-
-/* La cabaña con gente dentro lleva el margen del cuaderno a la izquierda: es la
-   misma marca que ya distingue lo que está tomado, y aquí dice "hay alguien
-   durmiendo ahí" sin inventar un color nuevo. */
-.luz-tarjeta.ocupada { border-left: 3px solid var(--timbre); }
+.luz-tarjeta.ocupada { box-shadow: inset 3px 0 0 var(--teal); }
+*/
 
 .luz-nota {
   display: block;
@@ -1287,28 +1180,23 @@ body.en-luces main   { padding: 0; max-width: none; }
   grid-template-columns: 1fr auto auto;
   align-items: center;
   gap: var(--e2);
-  padding: var(--e2) 0;
-  border-bottom: var(--alto-raya) solid var(--raya);
+  padding: var(--e3) 0;
+  border-bottom: 1px solid var(--borde-suave);
 }
 .el-ap:last-child { border-bottom: 0; }
 .el-ap-nombre { min-width: 0; font-size: 14px; overflow-wrap: anywhere; }
 .el-ap select { font-size: 13px; padding: var(--e1) var(--e2); }
 
-/* En un teléfono angosto los dos desplegables no caben al lado del nombre. */
 @media (max-width: 380px) {
   .el-ap { grid-template-columns: 1fr 1fr; }
   .el-ap-nombre { grid-column: 1 / -1; }
 }
 
 /* ── Los botones del mapa no son los botones del panel ──────────────────────
-   El panel le da a todo botón 46px de altura mínima y un radio propio: es la
-   medida de toque cómodo de sus formularios, y ahí está bien.
-
-   Dentro del mapa estorba. Ese diseño trae sus tamaños en línea —el SOS mide lo
-   que mide, la píldora también— y la altura mínima los inflaba: el SOS salía
-   como un círculo de 46px de alto en vez de una pastilla.
-
-   Se resetea lo que el diseño ya define por su cuenta. Lo que va en línea
+   El panel le da a todo botón 46px de altura mínima y forma de píldora; ese
+   diseño trae sus tamaños en línea y la altura mínima los inflaba — el SOS
+   salía como un círculo de 46px en vez de la pastilla que dibujó Design.
+   Se resetea lo que el mapa ya define por su cuenta: lo que va en línea
    siempre gana, así que esto solo quita lo que sobra y no pisa nada. */
 .lz-marco button {
   min-height: 0;
@@ -1320,30 +1208,26 @@ body.en-luces main   { padding: 0; max-width: none; }
 }
 
 /* ── El perímetro de alarma ─────────────────────────────────────────────────
-   Las tres animaciones que pide el diseño del mapa. Van aquí y no en línea
-   porque `@keyframes` no se puede escribir en un atributo `style`. */
+   Animaciones que pide el mapa. Van aquí y no en línea porque `@keyframes` no
+   se puede escribir en un atributo `style`. */
 @keyframes lz-dash  { to { stroke-dashoffset: -10.4 } }
 @keyframes lz-blink { 0%, 100% { opacity: 1 } 50% { opacity: 0.4 } }
 @keyframes lz-grow  { from { transform: scale(0.92); opacity: 0 }
                       to   { transform: scale(1);    opacity: 1 } }
 
-/* Los dos interruptores de la tinaja, listados bajo su tarjeta. Se ven aunque
-   el botón los accione juntos: cuando uno no responda hay que saber cuál antes
-   de subir a mirar. */
+/* Los dos interruptores de la tinaja, listados bajo su tarjeta. */
 .tj-llaves { margin: var(--e3) 0 var(--e2); }
 .tj-llave {
   display: flex; justify-content: space-between; gap: var(--e3);
   padding: var(--e2) 0;
   font-size: 12px; color: var(--tinta-2);
-  border-top: var(--alto-raya) solid var(--raya);
+  border-top: 1px solid var(--borde-suave);
 }
 .tj-llave span:last-child { color: var(--tinta-3); flex: none; }
-.tj-llave.fuera span:last-child { color: var(--error); font-weight: 600; }
+.tj-llave.fuera span:last-child { color: var(--peligro); font-weight: 600; }
 
 
 /* ------------------------------------------------------------ Temporadas -- */
-/* La nota que ya se escribia con estilos sueltos en cada tarjeta. Misma
-   apariencia, un solo sitio donde cambiarla. */
 .nota-campo {
   margin: 0 0 var(--e3);
   color: var(--tinta-3);
@@ -1351,19 +1235,18 @@ body.en-luces main   { padding: 0; max-width: none; }
   line-height: 1.45;
 }
 
-/* El año de un vistazo. Existe por una razón concreta: un hueco sin cubrir o
-   una temporada tapada por otra no se ven leyendo cuatro números sueltos, y el
-   error se descubre cuando alguien ya reservó a precio de invierno en enero.
-   Los tramos los calcula la MISMA función que cobra, así que esto no es una
-   ilustración de lo que deberia pasar: es lo que va a pasar. */
+/* El año de un vistazo. Los tramos los calcula la MISMA función que cobra, así
+   que esto no es una ilustración de lo que debería pasar: es lo que va a
+   pasar. Tres pesos del mismo acento, no tres colores. */
 #barra-anio {
   display: flex;
   width: 100%;
   height: 34px;
   margin-bottom: var(--e2);
-  border-radius: var(--radio-chico);
+  border-radius: 999px;
   overflow: hidden;
   background: var(--hoja-2);
+  gap: 2px;
 }
 .tramo-anio {
   display: flex;
@@ -1376,17 +1259,12 @@ body.en-luces main   { padding: 0; max-width: none; }
   letter-spacing: .02em;
   white-space: nowrap;
   overflow: hidden;
-  border-right: 1px solid var(--hoja);
 }
-.tramo-anio:last-child { border-right: 0; }
-/* Tres pesos del mismo sello, no tres colores. El que mas cuesta es el que
-   mas tinta lleva; asi la barra se lee sin leyenda. */
-.tramo-anio.caro   { background: var(--timbre);        color: var(--tinta-sobre-teal); }
-.tramo-anio.medio  { background: var(--timbre-lavado); color: var(--tinta-sobre-teal); }
-.tramo-anio.barato { background: var(--timbre-palido); color: var(--timbre); }
-.tramo-anio.base   { background: var(--hoja-2);        color: var(--tinta-3); }
+.tramo-anio.caro   { background: var(--teal);        color: var(--hoja); }
+.tramo-anio.medio  { background: var(--teal-medio);  color: var(--hoja); }
+.tramo-anio.barato { background: var(--teal-piel);   color: var(--teal); }
+.tramo-anio.base   { background: var(--hoja-2);      color: var(--tinta-3); }
 
-/* Los meses debajo, para poder situar los tramos sin contar cuadros. */
 #barra-anio + .meses-anio {
   display: grid;
   grid-template-columns: repeat(12, 1fr);
@@ -1402,28 +1280,27 @@ body.en-luces main   { padding: 0; max-width: none; }
   gap: 2px var(--e3);
   width: 100%;
   min-height: var(--toque);
-  padding: var(--e2) var(--e3);
+  padding: var(--e3) var(--e4);
   margin-bottom: var(--e2);
   background: var(--hoja-2);
-  border: 1px solid var(--raya);
-  border-radius: var(--radio-chico);
+  border: 0;
+  border-radius: var(--r-campo);
   text-align: left;
   font: inherit;
   color: var(--tinta);
   cursor: pointer;
 }
 .fila-temporada .tmp-nombre { font-weight: 600; }
-.fila-temporada .tmp-precio { font-weight: 600; text-align: right; }
+.fila-temporada .tmp-precio { font-weight: 700; text-align: right; }
 .fila-temporada .tmp-fechas {
   color: var(--tinta-3);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
-/* Una temporada apagada sigue en la lista, pero no finge que cobra. */
+.fila-temporada.inactiva { background: transparent; box-shadow: inset 0 0 0 1px var(--borde); }
 .fila-temporada.inactiva .tmp-nombre,
 .fila-temporada.inactiva .tmp-precio { color: var(--tinta-3); }
 
-/* El dia y el mes, uno al lado del otro. */
 .campo-md { display: grid; grid-template-columns: 1fr 1.6fr; gap: var(--e2); }
 
 .casilla {
@@ -1434,7 +1311,7 @@ body.en-luces main   { padding: 0; max-width: none; }
   margin-bottom: var(--e3);
   cursor: pointer;
 }
-.casilla input { width: 20px; height: 20px; accent-color: var(--timbre); }
+.casilla input { width: 22px; height: 22px; min-height: 0; padding: 0; border-radius: 6px; accent-color: var(--teal); }
 
 /* --------------------------------------------------------- Cotizaciones -- */
 .fila-cotizacion {
@@ -1443,56 +1320,57 @@ body.en-luces main   { padding: 0; max-width: none; }
   gap: 2px var(--e3);
   width: 100%;
   min-height: var(--toque);
-  padding: var(--e2) var(--e3);
+  padding: var(--e3) var(--e4);
   margin-bottom: var(--e2);
   background: var(--hoja-2);
-  border: 1px solid var(--raya);
-  border-radius: var(--radio-chico);
+  border: 0;
+  border-radius: var(--r-campo);
   text-align: left;
   font: inherit;
   color: var(--tinta);
   cursor: pointer;
 }
 .fila-cotizacion .ct-nombre { font-weight: 600; }
-.fila-cotizacion .ct-precio { font-weight: 600; text-align: right; }
+.fila-cotizacion .ct-precio { font-weight: 700; text-align: right; }
 .fila-cotizacion .ct-datos  { color: var(--tinta-3); font-size: 12px; }
-/* El codigo en monoespaciada: se dicta por telefono y se copia a mano, y en
-   proporcional la G y la 6 se parecen lo justo para equivocarse. */
+/* El código en monoespaciada: se dicta por teléfono y se copia a mano. */
 .fila-cotizacion .ct-codigo {
-  font: 600 12px/1.4 var(--fuente-mono);
+  font: 700 12px/1.4 var(--fuente-mono);
   letter-spacing: .04em;
-  color: var(--timbre);
+  color: var(--teal);
   text-align: right;
 }
-/* Vencida o con las fechas pasadas: sigue en la lista, pero apagada. */
+.fila-cotizacion.inactiva { background: transparent; box-shadow: inset 0 0 0 1px var(--borde); }
 .fila-cotizacion.inactiva .ct-nombre,
 .fila-cotizacion.inactiva .ct-precio,
 .fila-cotizacion.inactiva .ct-codigo { color: var(--tinta-3); }
 
 
 /* ============================================================== La barra == */
-/* Cuatro... seis columnas, y la activa NO se pinta: su icono se desvanece y
-   sube, y en su lugar aterriza una burbuja que viaja por la barra llevandoselo,
-   dentro de una muesca recortada en el borde superior.
+/* SE CONSERVA TAL CUAL DEL PANEL. Cuatro... seis columnas, y la activa NO se
+   pinta: su icono se desvanece y sube, y en su lugar aterriza una burbuja que
+   viaja por la barra llevándoselo, dentro de una muesca recortada en el
+   borde superior. Ya usaba el teal y el crema del lenguaje nuevo antes de
+   que existiera el lenguaje nuevo — por eso no cambia ni un valor.
 
    Todo en PORCENTAJE del ancho, nunca en pixeles fijos: la barra mide distinto
-   en cada telefono y los centros tienen que caer donde caiga la columna.
-   Con seis columnas los centros son 8.333 / 25 / 41.667 / 58.333 / 75 / 91.667
-   y la burbuja baja a 44px: en un iPhone de 390 la columna son 65px, y los 52
-   de la referencia se tocaban entre si. */
+   en cada telefono y los centros tienen que caer donde caiga la columna. */
 
 :root {
-  --barra-fondo:  #143D4A;   /* el timbre de la marca */
+  --barra-fondo:  #143D4A;   /* el teal del acento */
   --barra-alto:   62px;
   --burbuja:      44px;
   --burbuja-sube: 21px;      /* cuanto sobresale por encima del borde */
   /* Crema: el MISMO tono que la muesca y que las tarjetas del panel. Asi la
      burbuja no es un adorno pegado encima de la barra, es el papel que
-     asoma por el agujero. El cian salia fluor y el dorado gritaba. */
+     asoma por el agujero. */
   --acento-barra: #F2F1EC;
   --tinta-burbuja: #143D4A;
   --muesca-ancho: 92px;
 }
+
+/* Colchón para la barra fija Y para la burbuja, que sobresale por encima. */
+body { padding-bottom: calc(var(--barra-alto) + var(--burbuja-sube) + env(safe-area-inset-bottom, 0px) + 8px); }
 
 nav.tabs {
   position: fixed;
@@ -1517,7 +1395,7 @@ nav.tabs {
   pointer-events: none;
   transition: left .5s cubic-bezier(.34, 1.45, .64, 1);
 }
-.tabs-muesca path { fill: var(--papel); }
+.tabs-muesca path { fill: var(--fondo); }
 
 .tabs-burbuja {
   position: absolute;
@@ -1552,8 +1430,10 @@ nav.tabs button {
   gap: 3px;
   min-width: 0;
   padding: 0 2px;
+  height: auto; min-height: 0;
   background: none;
   border: 0;
+  border-radius: 0;
   color: rgba(242, 241, 236, .62);
   font: 600 9.5px/1.2 var(--fuente);
   letter-spacing: .01em;
@@ -1572,13 +1452,8 @@ nav.tabs button[aria-selected="true"] svg { opacity: 0; transform: translateY(-1
 @keyframes railIn       { 0% { transform: scale(.08); opacity: .85 } 100% { transform: scale(1); opacity: 1 } }
 @keyframes velolIn      { from { opacity: 0 } to { opacity: 1 } }
 
-/* Con una ventana abierta la barra se retira. No es solo que estorbe: mientras
-   rellenas una reserva no hay ningún viaje que hacer a otra pestaña, y esos
-   62 px son los que le faltaban a la hoja para enseñar su último botón. */
+/* Con una ventana abierta la barra se retira. */
 body.modal-abierto nav.tabs { display: none; }
-
-/* Sitio para la barra Y para la burbuja, que sobresale por encima. */
-body { padding-bottom: calc(var(--barra-alto) + var(--burbuja-sube) + env(safe-area-inset-bottom, 0px) + 8px); }
 
 /* ------------------------------------------------------------- El riel --- */
 .riel-velo {
@@ -1606,9 +1481,8 @@ body { padding-bottom: calc(var(--barra-alto) + var(--burbuja-sube) + env(safe-a
   pointer-events: none;
   transition: top .5s cubic-bezier(.34, 1.45, .64, 1);
 }
-/* Dos capas: el fondo de la pagina y encima el mismo velo. Con una sola se ve
-   un parche claro flotando sobre lo oscurecido. */
-.riel-muesca .base { fill: var(--papel); }
+/* Dos capas: el fondo de la pagina y encima el mismo velo. */
+.riel-muesca .base { fill: var(--fondo); }
 .riel-muesca .velo { fill: rgba(30, 30, 30, .42); }
 
 .riel-burbuja {
@@ -1632,8 +1506,7 @@ body { padding-bottom: calc(var(--barra-alto) + var(--burbuja-sube) + env(safe-a
 .riel-fila svg { width: 20px; height: 20px; }
 .riel-sep { height: 1px; margin: 5px auto; width: 22px; background: rgba(242, 241, 236, .22); }
 
-/* La etiqueta ES el boton de entrar. Con iconos solos, entrar de un toque es
-   entrar a ciegas. */
+/* La etiqueta ES el boton de entrar. */
 .riel-tag {
   position: fixed;
   right: 104px;
@@ -1663,23 +1536,22 @@ body { padding-bottom: calc(var(--barra-alto) + var(--burbuja-sube) + env(safe-a
 
 
 /* ---------------------------------------------------------------- Atlas -- */
-/* La pantalla de lo que hace Atlas solo. El bloque de estado va PRIMERO y con
-   punto de color porque es lo unico que cambia el significado de todo lo demas:
-   una lista de reservas con Atlas caido es historia, no un estado al dia. */
+/* Igual que Avisos: viva y funcionando es la única condición que se pinta —
+   tarjeta teal sólida, como en el diseño aprobado—; todo lo demás se queda
+   neutro y lo explica la letra ("no lo sé todavía", "sin señal desde..."). */
 .at-estado {
   display: flex; align-items: center; gap: 12px;
-  background: var(--hoja); border: 1px solid var(--raya);
-  border-left: 3px solid var(--tinta-3);
-  border-radius: var(--radio); padding: 15px 16px;
+  background: var(--hoja);
+  border-radius: var(--r-tarjeta); padding: var(--e4);
+  box-shadow: var(--sombra);
 }
 .at-estado b { font-size: 15px; }
-.at-estado.vivo        { border-left-color: var(--ok); }
-.at-estado.caido       { border-left-color: var(--error); }
-.at-estado.desconocido { border-left-color: var(--alerta); }
+.at-estado.vivo { background: var(--teal); color: var(--hoja); box-shadow: none; }
+.at-estado.vivo .av-sub { color: color-mix(in srgb, var(--hoja) 80%, transparent); }
 .at-punto { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: var(--tinta-3); }
-.at-estado.vivo  .at-punto { background: var(--ok); animation: at-latir 2.4s ease-in-out infinite; }
-.at-estado.caido .at-punto { background: var(--error); }
-.at-estado.desconocido .at-punto { background: var(--alerta); }
+.at-estado.vivo  .at-punto { background: var(--hoja); animation: at-latir 2.4s ease-in-out infinite; }
+.at-estado.caido .at-punto,
+.at-estado.desconocido .at-punto { background: var(--apagado); }
 /* Late despacio: es un indicador de fondo, no algo que reclame atencion. */
 @keyframes at-latir { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) {
@@ -1688,56 +1560,53 @@ body { padding-bottom: calc(var(--barra-alto) + var(--burbuja-sube) + env(safe-a
 
 .at-resumen {
   display: flex; align-items: center; gap: 16px; margin-top: 12px;
-  background: var(--hoja); border: 1px solid var(--raya);
-  border-radius: var(--radio); padding: 15px 16px;
+  background: var(--hoja);
+  border-radius: var(--r-tarjeta); padding: var(--e4);
+  box-shadow: var(--sombra);
 }
-.at-numero { font-size: 34px; font-weight: 600; line-height: 1; color: var(--timbre); }
+.at-numero { font: 700 34px/1 var(--fuente); color: var(--teal); }
 .at-resumen b { font-size: 14px; font-weight: 600; }
 
 .at-problemas { display: flex; flex-direction: column; gap: 8px; }
 .at-problema {
   display: flex; align-items: center; justify-content: space-between; gap: 14px;
-  background: var(--hoja); border: 1px solid var(--raya);
-  border-left: 3px solid var(--error);
-  border-radius: var(--radio-chico); padding: 13px 15px;
+  background: var(--hoja);
+  border-radius: var(--r-campo); padding: var(--e3) var(--e4);
+  box-shadow: var(--sombra);
 }
+.at-problema-txt { flex: 1; min-width: 0; }
 .at-problema b { font-size: 14px; font-weight: 600; }
 .at-problema button { flex-shrink: 0; min-height: var(--toque); border-radius: 999px; padding: 0 16px; font-size: 13px; }
 
 .at-lista { display: flex; flex-direction: column; gap: 8px; }
 .at-fila {
   display: flex; align-items: center; justify-content: space-between; gap: 14px;
-  background: var(--hoja); border: 1px solid var(--raya);
-  border-radius: var(--radio-chico); padding: 13px 15px;
+  background: var(--hoja);
+  border-radius: var(--r-campo); padding: var(--e3) var(--e4);
+  box-shadow: var(--sombra);
 }
 .at-fila b { font-size: 14px; font-weight: 600; }
 .at-cuando { font-size: 12px; color: var(--tinta-3); flex-shrink: 0; }
 .at-todo-ok { font-size: 13px; color: var(--tinta-3); margin-top: 18px; }
 
 /* --------------------------------------------------------------- Tareas -- */
-/* La lista de pendientes, con renglones dentro de una sola tarjeta. El filtro
-   va arriba, en la misma caja que la lista a la que manda.
+/* La lista de pendientes, con renglones dentro de una sola tarjeta.
 
-   ATRASADA no estrena color: lo dicen el filete de tinta en el canto, el peso
-   del texto y la palabra. El libro tiene un solo acento y sigue teniéndolo. */
+   ATRASADA no estrena color: lo dicen el peso del texto y la palabra — el
+   panel tiene un solo acento y sigue teniéndolo. */
 .ta-cabecera { display: flex; gap: var(--e2); margin-bottom: var(--e3); }
-.ta-cabecera select { flex: 1; min-width: 0; }
+.ta-cabecera select { flex: 1; min-width: 0; border-radius: 999px; }
 .ta-cabecera button { flex: none; font-size: 13.5px; }
 
 /* La fila NUNCA cambia de alto al marcarse: el check se dibuja dentro de su
    casilla, el tachado es un trazo encima del texto y el latido es transform,
-   que no ocupa sitio. El alto solo se anima al PLEGARSE, cuando la fila se va
-   de una lista a la otra — así las de abajo suben con ella y no de un salto. */
+   que no ocupa sitio. */
 .ta-fila {
   display: flex; align-items: stretch;
-  border-bottom: 1px solid var(--raya);
-  border-left: 3px solid transparent;
-  transition: height .26s cubic-bezier(.55, 0, .35, 1), opacity .18s ease,
-              border-color .26s ease;
+  border-bottom: 1px solid var(--borde-suave);
+  transition: height .26s cubic-bezier(.55, 0, .35, 1), opacity .18s ease;
 }
-/* Transparente y no `none`: quitar el borde le cambiaría el alto a la última. */
 .ta-fila:last-child { border-bottom-color: transparent; }
-.ta-fila.atrasada { border-left-color: var(--tinta); }
 .ta-fila.saliendo {
   height: 0 !important; opacity: 0; overflow: hidden;
   border-bottom-color: transparent;
@@ -1749,19 +1618,19 @@ body { padding-bottom: calc(var(--barra-alto) + var(--burbuja-sube) + env(safe-a
   display: flex; align-items: center; justify-content: flex-start;
 }
 .ta-caja {
-  width: 23px; height: 23px; border-radius: var(--radio-chico);
-  border: 1.5px solid var(--raya-fuerte); background: var(--hoja-2);
+  width: 24px; height: 24px; border-radius: 8px;
+  background: var(--hoja-2); box-shadow: inset 0 0 0 1.5px var(--apagado);
   display: flex; align-items: center; justify-content: center;
-  transition: background .18s ease, border-color .18s ease;
+  transition: background .18s ease, box-shadow .18s ease;
 }
-.ta-caja svg { width: 14px; height: 14px; color: var(--tinta-sobre-teal); }
+.ta-caja svg { width: 14px; height: 14px; color: var(--hoja); }
 /* El check se DIBUJA, de la esquina a la punta: es la marca del lápiz, no un
    icono que aparece. Al deshacer recorre el mismo camino de vuelta. */
 .ta-caja path {
   stroke-dasharray: 21; stroke-dashoffset: 21;
   transition: stroke-dashoffset .28s cubic-bezier(.55, 0, .35, 1) .05s;
 }
-.ta-fila.hecha .ta-caja { background: var(--timbre); border-color: var(--timbre); }
+.ta-fila.hecha .ta-caja { background: var(--teal); box-shadow: none; }
 .ta-fila.hecha .ta-caja path { stroke-dashoffset: 0; }
 /* El acuse del toque: la casilla late una vez. */
 .ta-fila.marcando .ta-caja { animation: ta-acuse .34s cubic-bezier(.34, 1.56, .64, 1); }
@@ -1780,8 +1649,8 @@ body { padding-bottom: calc(var(--barra-alto) + var(--burbuja-sube) + env(safe-a
   font-size: 14.5px; line-height: 1.35; font-weight: 500;
   transition: color .25s ease;
 }
-/* El tachado BARRE el texto de izquierda a derecha: es el gesto de tachar en
-   el libro. `text-decoration` no se puede animar; este trazo sí. */
+/* El tachado BARRE el texto de izquierda a derecha: `text-decoration` no se
+   puede animar; este trazo sí. */
 .ta-texto::after {
   content: ""; position: absolute; left: -2px; right: -2px;
   top: calc(50% - 1px); height: 1.5px; border-radius: 1px;
@@ -1791,7 +1660,7 @@ body { padding-bottom: calc(var(--barra-alto) + var(--burbuja-sube) + env(safe-a
 }
 .ta-fila.hecha .ta-texto { color: var(--tinta-3); }
 .ta-fila.hecha .ta-texto::after { transform: scaleX(1); }
-.ta-fila.atrasada .ta-texto { font-weight: 600; }
+.ta-fila.atrasada .ta-texto { font-weight: 700; }
 
 .ta-meta { display: block; font-size: 12px; color: var(--tinta-3); margin-top: 2px; }
 .ta-meta b { font-weight: 600; color: var(--tinta-2); font-variant-numeric: tabular-nums; }
@@ -1801,32 +1670,28 @@ body { padding-bottom: calc(var(--barra-alto) + var(--burbuja-sube) + env(safe-a
   font-size: 10.5px; font-weight: 700; color: var(--tinta);
 }
 
-/* Prioridad alta: un sello de tinta, no un color nuevo. */
+/* Prioridad alta: una etiqueta de tinta, no un color nuevo. */
 .ta-alta {
   display: inline-block; vertical-align: 2px; margin-left: 6px;
   font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
-  color: var(--tinta-2); border: 1px solid var(--raya-fuerte);
-  border-radius: 3px; padding: 1px 5px;
+  color: var(--tinta-2); box-shadow: inset 0 0 0 1px var(--apagado);
+  border-radius: 4px; padding: 1px 5px;
 }
 
 .ta-hechas-titulo {
-  font-size: 11px; text-transform: uppercase; letter-spacing: .14em;
-  color: var(--tinta-3); font-weight: 700;
+  font: 700 11px/1 var(--fuente); text-transform: uppercase; letter-spacing: .16em;
+  color: var(--tinta-3);
   margin: var(--e4) 0 var(--e1);
 }
 
-/* La fila que llega —a hechas al marcar, a pendientes al deshacer o al
-   guardar— entra con la huella del sello desvaneciéndose: se ve DÓNDE quedó,
-   sin que nada se desplace. */
+/* La fila que llega entra con la huella del acento desvaneciéndose. */
 .ta-fila.entrando { animation: ta-entra .6s ease; }
 @keyframes ta-entra {
-  0%   { opacity: 0; background: var(--timbre-palido); }
-  45%  { opacity: 1; background: var(--timbre-palido); }
+  0%   { opacity: 0; background: var(--teal-piel); }
+  45%  { opacity: 1; background: var(--teal-piel); }
   100% { background: transparent; }
 }
 
-/* Movimiento reducido: queda el fundido, que informa del cambio; se van los
-   barridos y el pliegue, que son los que se mueven por la pantalla. */
 @media (prefers-reduced-motion: reduce) {
   .ta-fila { transition: opacity .15s ease; }
   .ta-caja, .ta-caja path, .ta-texto, .ta-texto::after { transition: none; }
@@ -1834,3 +1699,155 @@ body { padding-bottom: calc(var(--barra-alto) + var(--burbuja-sube) + env(safe-a
   .ta-fila.entrando { animation: ta-entra-quieto .25s ease; }
 }
 @keyframes ta-entra-quieto { from { opacity: 0; } }
+
+/* ============================================================================
+   Piezas del rediseño que el marcado ya emite
+   ============================================================================
+   Todo lo de aquí sale medido de las láminas de `panel-rediseno/`. Se añade al
+   final porque llegó con la segunda ola —la que cambió el HTML que escribe
+   `app.js`— y separarlo deja ver de un vistazo qué es nuevo.
+   ============================================================================ */
+
+/* ── Hoy: un solo bloque, tres grupos ───────────────────────────────────────
+   Antes eran tres tarjetas sueltas. El diseño las funde en una, porque la
+   pregunta de la mañana es una sola: qué se mueve hoy. */
+.hoy-personas { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.hoy-persona  { display: flex; align-items: center; gap: 8px; min-width: 0; width: 100%; }
+.hoy-persona-txt    { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.hoy-persona-nombre { font: 600 13.5px/1.2 var(--fuente); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hoy-persona-cab    { font-weight: 400; color: var(--tinta-3); }
+.hoy-persona-meta   { font: 400 12px/1.2 var(--fuente); color: var(--tinta-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hoy-persona-tag    { font: 600 11px/1 var(--fuente); color: var(--tinta-2); white-space: nowrap; flex: none; }
+
+.hoy-noche    { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 0; font: 400 12px/1 var(--fuente); color: var(--tinta-3); }
+.hoy-pildoras { display: flex; gap: 5px; }
+.hoy-pildora  { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 999px;
+                font: 600 10.5px/1 var(--fuente); background: var(--hoja-2); color: var(--tinta-3); white-space: nowrap; flex: none; }
+.hoy-pildora.activa { background: var(--teal); color: var(--hoja); }
+
+/* ── Calendario: una raya por cabaña ────────────────────────────────────────
+   Tres rayas siempre en el mismo orden, para que una estadía se lea a lo largo
+   de la semana. La celda deja de ser cuadrada: el número arriba, las rayas
+   abajo. */
+.dia.multi {
+  aspect-ratio: auto; height: 58px;
+  flex-direction: column; align-items: stretch; justify-content: space-between;
+  padding: 7px 6px 6px; gap: 0; text-align: left;
+}
+.dia-num   { font: 600 14px/1 var(--fuente); letter-spacing: -.02em; }
+.dia-rayas { display: flex; flex-direction: column; gap: 2px; }
+/* El `padding: 0` NO sobra. En este panel ya existe una clase suelta
+   `.ocupada` —la tarjeta de cabaña ocupada, con 12 px de relleno— y la raya
+   usa ese mismo nombre como modificador. Sin este reset la raya heredaba ese
+   relleno y se convertía en un bloque de 24 px que se salía de la celda. */
+.dia-raya  { height: 4px; padding: 0; margin: 0; border-radius: 2px; background: var(--borde); }
+.dia-raya.ocupada { background: var(--teal); }
+.dia-raya.airbnb  { background: var(--airbnb); }
+.dia-raya.libre   { background: var(--borde); }
+
+/* El día de hoy va en teal sólido, como en el diseño. Y ahí las rayas SE
+   INVIERTEN: una raya teal sobre fondo teal no se ve, y era justo el día que
+   más se mira. Ocupada en crema, libre en crema al 30 %. */
+.dia.multi.hoy { background: var(--teal); color: var(--hoja); box-shadow: none; }
+.dia.multi.hoy.rango-multi { outline-color: var(--hoja); }
+
+/* La inversión vale para CUALQUIER tile de fondo teal, no solo el de hoy: un
+   día sin disponibilidad también se pinta en teal sólido, y ahí sus tres rayas
+   teal desaparecían igual. Se descubrió mirando el día 13, no midiéndolo. */
+.dia.multi.hoy .dia-raya.ocupada,
+.dia.multi.ocupado .dia-raya.ocupada,
+.dia.multi.airbnb .dia-raya.ocupada { background: var(--hoja); }
+.dia.multi.hoy .dia-raya.libre,
+.dia.multi.ocupado .dia-raya.libre,
+.dia.multi.airbnb .dia-raya.libre   { background: rgba(242, 241, 236, .3); }
+
+/* ── Estados: la píldora que dice en qué va algo ───────────────────────────── */
+.estado {
+  display: inline-flex; align-items: center; height: 26px; padding: 0 10px;
+  border-radius: 999px; background: var(--teal-piel); color: var(--teal);
+  font: 700 10.5px/1 var(--fuente); letter-spacing: .06em; text-transform: uppercase;
+  white-space: nowrap; flex: none;
+}
+.estado.hecho { background: var(--hoja-2); color: var(--tinta-3); }
+/* Un turno negado no es un "listo" más: hay que ver de un vistazo a quién hay
+   que ofrecerle otra hora. Se dice con la palabra y con la letra, sin fondo. */
+.estado.rechazada { background: transparent; border: 1px solid var(--borde); color: var(--peligro); }
+
+/* ── Círculos de icono ──────────────────────────────────────────────────────
+   La misma pieza en tres sitios: el tipo de solicitud, el problema de Atlas y
+   el estado de los avisos. */
+.sol-ico, .ico-teal {
+  width: 40px; height: 40px; flex: none; border-radius: 50%;
+  background: var(--teal-piel); color: var(--teal);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+/* Una solicitud ya cerrada no sigue pidiendo nada: pierde el acento. */
+.hu-sol.hecha .sol-ico { background: var(--hoja-2); color: var(--tinta-3); }
+.sol-ico svg, .ico-teal svg { width: 20px; height: 20px; }
+
+/* Atlas vivo: el pulso pasa del punto que ya no se emite al círculo del icono. */
+.at-estado.vivo .ico-teal { animation: at-latir 2.4s ease-in-out infinite; }
+
+/* ── Aseos: la placa del día ────────────────────────────────────────────────
+   Al personal de limpieza le sirve la fecha antes que el nombre, así que la
+   fecha es la pieza que ordena la fila. */
+.aseo-placa {
+  width: 56px; height: 56px; flex: none; border-radius: 18px;
+  background: var(--hoja-2); color: var(--tinta);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+}
+.aseo-placa-dia { font: 700 20px/1 var(--fuente); }
+.aseo-placa-dow { font: 600 10px/1 var(--fuente); letter-spacing: .08em; text-transform: uppercase; color: var(--tinta-3); }
+/* Sale a las 11:00 y entra alguien a las 16:00: cinco horas para dejarla lista.
+   La urgencia se dice con peso, no con un color de alarma que esta paleta no
+   tiene. */
+.aseo-linea.urgente .aseo-placa { background: var(--teal); color: var(--hoja); }
+.aseo-linea.urgente .aseo-placa-dow { color: rgba(242, 241, 236, .75); }
+.aseo-linea { display: flex; align-items: center; gap: 14px; }
+
+/* Variantes de tarjeta que usa el marcado nuevo, calcadas de `base.css`. */
+/* La que contiene filas: el aire lo ponen las propias filas, no la tarjeta. */
+.tarjeta.lista { padding: 6px 16px; gap: 0; }
+.tarjeta.plana { padding: 16px; }
+/* El cuerpo de una fila: nombre arriba, dato secundario debajo, y que el texto
+   largo se corte en vez de empujar la fila. */
+.fila-txt { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.fila-txt b    { font: 600 15px/1.2 var(--fuente); }
+.fila-txt span { font: 400 13px/1.2 var(--fuente); color: var(--tinta-2); }
+
+/* La muestra de la leyenda: una raya, no un cuadrado, porque es una raya lo
+   que hay que reconocer en el calendario. */
+/* Va con `.leyenda i` delante: la regla general de la leyenda dibuja cuadrados
+   de 12x12 y le gana en especificidad a una clase suelta. */
+.leyenda i.raya-ley { width: 18px; height: 4px; border-radius: 2px; flex: none; background: var(--borde); }
+.leyenda i.raya-ley.ocupada { background: var(--teal); padding: 0; margin: 0; }
+.leyenda i.raya-ley.airbnb  { background: var(--airbnb); }
+.leyenda-nota { color: var(--tinta-3); }
+
+/* El circulo con las iniciales. Es la forma de presentar a una persona en todo
+   el panel: la misma en Gente, en Llegan pronto y en Atlas. */
+.avatar {
+  width: 44px; height: 44px; flex: none; border-radius: 50%;
+  background: var(--teal); color: var(--hoja);
+  display: inline-flex; align-items: center; justify-content: center;
+  font: 700 14px/1 var(--fuente);
+}
+/* Airbnb con su color: es la unica reserva que no entro por una puerta nuestra
+   y conviene distinguirla de un vistazo. */
+.avatar.airbnb { background: var(--airbnb); }
+
+/* Fila de botones. Dos por fila como mucho a 390 px. */
+.botonera { display: flex; gap: 8px; }
+.botonera > button { flex: none; }
+button.crece { flex: 1; min-width: 0; }
+
+/* Una accion ya hecha se apaga, pero NO se desactiva. */
+button.hecho { background: var(--hoja-2); color: var(--tinta-3); font-weight: 500; }
+
+/* La fila de aseo tiene dos columnas: la placa del día y el texto. El aviso de
+   "hay que limpiarla este mismo día" NO es una tercera columna — metido en la
+   misma línea le robaba el ancho al nombre y lo partía palabra por palabra.
+   Baja a su propio renglón, ocupando la fila entera. */
+.aseo-linea { flex-wrap: wrap; }
+.aseo-linea .fila-txt { flex: 1 1 0; min-width: 0; }
+.aseo-linea .aseo-aviso { flex: 1 0 100%; margin: 0; }
