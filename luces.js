@@ -39,7 +39,7 @@ const LZ_PROP = 390 / 844;
 /* Se enseña en una esquina del mapa. Parece una tontería y no lo es: sin esto,
    "sigo viendo lo de antes" y "no se subió el cambio" son indistinguibles desde
    fuera, y se pierde media hora adivinando cuál de los dos es. */
-const LZ_VER = 23;
+const LZ_VER = 24;
 
 /* ── Posiciones movidas a mano ─────────────────────────────────────────────
    Mandan sobre las del diseño. Existen para que mover un edificio dos puntos a
@@ -200,25 +200,6 @@ const LZ_GRUPOS = {
     { name: 'Tinaja - SmartLife', icon: LZ_IC.agua, tinaja: true, ch: [['tinaja','Canal1']] },
   ],
 };
-
-/* Las cuatro tarjetas del resumen bajo el plano (lámina `#luces` de
-   panel-rediseno): Sala, Bodega, Piscina y Tinaja. No son edificios nuevos —
-   `id` apunta a la zona de verdad y `k` al canal, así que tocar una abre el
-   mismo panel de interruptores que tocar el edificio en el mapa. `k: null`
-   (Bodega) resume TODOS sus canales en una sola tarjeta. Los iconos son los
-   de la lámina, calcados tal cual — Lucide, trazo 1.9, sin relleno. */
-const LZ_ZONAS_CFG = [
-  { id: 'pump', k: 'bombas',  name: 'Sala',
-    icon: '<path d="M9 18h6M10 21.5h4"/><path d="M12 2.5a6.5 6.5 0 0 0-4 11.6V18h8v-3.9a6.5 6.5 0 0 0-4-11.6Z"/>' },
-  { id: 'bod',  k: null,      name: 'Bodega',
-    icon: '<path d="M9 18h6M10 21.5h4"/><path d="M12 2.5a6.5 6.5 0 0 0-4 11.6V18h8v-3.9a6.5 6.5 0 0 0-4-11.6Z"/>' },
-  { id: 'pool', k: 'piscina', name: 'Piscina',
-    icon: '<path d="M2 14c2 0 2-2 4-2s2 2 4 2 2-2 4-2 2 2 4 2 2-2 4-2"/><path d="M2 19c2 0 2-2 4-2s2 2 4 2 2-2 4-2 2 2 4 2 2-2 4-2"/>' },
-  /* La tinaja no dice si está encendida cuando no le toca: dice cuándo es el
-     próximo turno, igual que su grupo dentro del panel de Sala. */
-  { id: 'pump', k: 'tinaja',  name: 'Tinaja', tinaja: true,
-    icon: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>' },
-];
 
 /* Escapa aquí y no reutilizando el de `app.js`. Es una línea, y a cambio este
    archivo deja de depender del orden en que se carguen los dos: `app.js` vive
@@ -511,32 +492,9 @@ function lzValores() {
   const iconoAbierto = 'M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3';
   const iconoCerrado = 'M6 11h12v9H6zM15 11V8a3 3 0 0 0-5.7-1.4';
 
-  /* ── El resumen de zonas ──────────────────────────────────────────────────
-     La misma regla que en cada interruptor de abajo: mientras no se sabe, la
-     tarjeta lo DICE en vez de inventar un estado. */
-  const zonas = LZ_ZONAS_CFG.map((z) => {
-    const b = BS.find((x) => x.id === z.id) || selB;
-    const claves = z.k ? [z.k] : lzAmbientes(b);
-    const fuera = claves.some((k) => S.fuera.has(`${z.id}:${k}`));
-    const pend  = claves.some((k) => S.pend[`${z.id}:${k}`]);
-    const nOn   = claves.filter((k) => encendida(z.id, k)).length;
-    const on    = nOn > 0;
-    let estado;
-    if (!S.listo)                estado = 'cargando…';
-    else if (fuera)              estado = 'sin señal';
-    else if (pend)                estado = 'cambiando…';
-    else if (z.tinaja && !on)     estado = S.proxTinaja || 'sin turno hoy';
-    else if (claves.length > 1)  estado = on ? `${nOn} de ${claves.length} encendidas` : 'apagada';
-    else                          estado = on ? 'encendida' : 'apagada';
-    return { id: z.id, name: z.name, icon: z.icon, on, estado };
-  });
-  /* Visible cuando el mapa está en reposo; el panel de interruptores de un
-     edificio abierto ocupa el mismo sitio y se lo cede al tocar uno. */
-  const zonasFx = `position:absolute;left:0;right:0;bottom:0;top:46%;z-index:7;display:flex;flex-direction:column;padding:14px 12px calc(14px + env(safe-area-inset-bottom));overflow-y:auto;background:linear-gradient(180deg, rgba(236,235,228,0.94), rgba(236,235,228,0.99));backdrop-filter:blur(10px);border-radius:18px 18px 0 0;border-top:1px solid #DAD9D0;opacity:${!S.open?1:0};pointer-events:${!S.open?'auto':'none'};transform:translateY(${!S.open?0:24}px);transition:opacity .35s ease ${!S.open?dl:0}s, transform .4s ease ${!S.open?dl:0}s;`;
-
   const sel = cuenta(selB);
   return {
-    edificios, planeFx, grupos, zonas, zonasFx, total: String(total),
+    edificios, planeFx, grupos, total: String(total),
 
     alarmaW: String(gr),
     alarmaDash: estilo === 'Continua' ? 'none'
@@ -701,11 +659,6 @@ function lzMontar(caja) {
           <button type="button" id="lz-selof" style="${v.selOffFx}">Apagar</button>
         </div>
         <div id="lz-panel" style="${v.panelFx}"></div>
-        <!-- El resumen de Sala, Bodega, Piscina y Tinaja (lámina "luces").
-             Ocupa el mismo hueco que el panel de interruptores y aparece
-             cuando ese está cerrado: es "el plano y, debajo, los controles"
-             del mapa en reposo, antes de tocar un edificio. -->
-        <div id="lz-zonas" style="${v.zonasFx}"></div>
         <button type="button" id="lz-toast" style="${v.toastFx}">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
                stroke-width="2.2" stroke-linecap="round"><path d="M12 8v5M12 17v.01"></path>
@@ -738,7 +691,6 @@ function lzMontar(caja) {
     total:  caja.querySelector('#lz-total'),
     barra:  caja.querySelector('#lz-barra'),
     panel:  caja.querySelector('#lz-panel'),
-    zonas:  caja.querySelector('#lz-zonas'),
     selname: caja.querySelector('#lz-selname'),
     selsub:  caja.querySelector('#lz-selsub'),
     selof:   caja.querySelector('#lz-selof'),
@@ -766,7 +718,6 @@ function lzMontar(caja) {
   lzMedir();
   lzGestos();
   lzPintarPanel();
-  lzPintarZonas();
 }
 
 function lzMedir() {
@@ -836,7 +787,6 @@ function lzPintar() {
   R.toast.dataset.zona       = v.toastZona;
 
   lzPintarPanel(v);
-  lzPintarZonas(v);
   lzPintarEditor();
 }
 
@@ -906,39 +856,6 @@ function lzPintarPanelInterno(v) {
           </button>`).join('')}
       </div>
     </div>`).join('');
-}
-
-/* El resumen de zonas (Sala, Bodega, Piscina, Tinaja). Se reescribe entero en
-   cada pintado, igual que el panel de interruptores: la única transición que
-   hay que conservar es la de la caja que las contiene (`zonasFx`), no la de
-   sus tarjetas. */
-function lzPintarZonas(v) {
-  if (!LZ.refs || !LZ.refs.zonas) return;
-  v = v || lzValores();
-  LZ.refs.zonas.style.cssText = v.zonasFx;
-  try {
-    LZ.refs.zonas.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
-      + v.zonas.map((z) => `
-        <button type="button" data-tap="${z.id}" class="tarjeta${z.on ? ' teal' : ''}"
-                style="display:flex;flex-direction:column;align-items:flex-start;gap:14px;border-radius:22px;padding:16px;margin:0;min-height:112px;width:100%;text-align:left;cursor:pointer;
-                       background:${z.on ? 'var(--teal)' : 'var(--hoja)'};color:${z.on ? 'var(--hoja)' : 'var(--tinta)'};box-shadow:${z.on ? 'none' : 'var(--sombra)'}">
-          <span style="width:38px;height:38px;border-radius:50%;flex:none;background:${z.on ? 'rgba(242,241,236,.16)' : 'var(--hoja-2)'};color:${z.on ? 'inherit' : 'var(--tinta-3)'};display:inline-flex;align-items:center;justify-content:center">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${z.icon}</svg>
-          </span>
-          <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-            <span style="font:600 15px/1.2 system-ui">${lzEsc(z.name)}</span>
-            <span style="font:400 12px/1 system-ui;${z.on ? 'opacity:.75' : 'color:var(--tinta-3)'}">${lzEsc(z.estado)}</span>
-          </div>
-        </button>`).join('')
-      + '</div>';
-  } catch (e) {
-    /* Igual que el panel de interruptores: si esto revienta, que lo diga en
-       el sitio donde debería haber tarjetas, no en blanco. */
-    LZ.refs.zonas.innerHTML =
-      '<div style="background:#F4F3EC;border:1px solid #B0453C;border-radius:12px;'
-      + 'padding:12px 14px;font-size:12px;color:#B0453C;word-break:break-word">'
-      + '<b>No se pudo pintar el resumen</b><br>' + lzEsc(e.message) + '</div>';
-  }
 }
 
 /* ── Gestos ───────────────────────────────────────────────────────────────
