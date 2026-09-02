@@ -2974,7 +2974,9 @@ function pintarCotizaciones() {
               data-cotizacion="${c.id}">
         <span class="ct-nombre">${esc(c.nombre)}</span>
         <span class="ct-precio">${clp(c.precio_noche)}</span>
-        <span class="ct-datos">${esc(nombreCabana(c.cabana_id))} &middot; ${fechaCorta(c.desde)} a ${fechaCorta(c.hasta)}${
+        <!-- Sin el "Cabaña" delante y con flecha en vez de "a", como en la
+             lamina: asi la linea cabe de una en 390 px. -->
+        <span class="ct-datos">${esc(nombreCabana(c.cabana_id).replace(/^Cabaña\s+/i, ""))} &middot; ${fechaCorta(c.desde)} &rarr; ${fechaCorta(c.hasta)}${
           c.noche_extra_pct ? ` &middot; +noche ${c.noche_extra_pct}%` : ""}${
           estado ? ` &middot; ${estado}` : ""}</span>
         <span class="ct-codigo">${esc(c.codigo)}</span>

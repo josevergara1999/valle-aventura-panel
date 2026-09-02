@@ -1887,3 +1887,18 @@ input[type="time"], input[type="date"] {
    pegado al borde derecho aunque la caja ya mida bien. */
 input[type="time"]::-webkit-date-and-time-value,
 input[type="date"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
+
+/* La fila de cotizacion es una rejilla, y una celda de rejilla no encoge por
+   debajo de su contenido salvo que se le diga. Con un nombre de cabaña largo
+   el contenido medía 329 px dentro de una capsula de 326: el texto empezaba
+   fuera por la izquierda y el codigo terminaba fuera por la derecha. */
+.fila-cotizacion > * { min-width: 0; }
+.fila-cotizacion .ct-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* La linea de datos puede partir si hace falta: es preferible a que empuje. */
+.fila-cotizacion .ct-datos { overflow-wrap: anywhere; }
+
+/* La linea de datos puede partir en dos renglones. La fila es un <button>, y
+   del boton generico hereda `white-space: nowrap`: la caja medía bien pero el
+   texto se pintaba fuera, encima del codigo. Perder "vencida" por un recorte
+   seria peor que una segunda linea. */
+.fila-cotizacion .ct-datos { white-space: normal; }
