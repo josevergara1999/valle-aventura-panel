@@ -1902,3 +1902,9 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
    texto se pintaba fuera, encima del codigo. Perder "vencida" por un recorte
    seria peor que una segunda linea. */
 .fila-cotizacion .ct-datos { white-space: normal; }
+
+/* Medidas exactas de la lámina `#gente`: el nombre de la tarjeta de huésped va
+   a 16 px, no a los 15 de una fila corriente, y la tarjeta cierra con 14 px
+   abajo en vez de 16. */
+.hu-card { padding: 16px 16px 14px; }
+.hu-card .fila-txt b { font-size: 16px; }

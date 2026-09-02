@@ -3476,6 +3476,7 @@ async function pintarHuespedes() {
   const tarjeta = (b, yaLlego) => {
     const cab = st.cabanas.find((c) => c.id === b.cabana_id);
     const avisado = !!b.confirmacion_enviada_at;
+    const noches = nochesEntre(b.desde, b.hasta);
     return `
       <div class="hu-card" data-huesped="${b.id}">
         <div class="hu-card-top">
@@ -3485,7 +3486,8 @@ async function pintarHuespedes() {
             <!-- Sin el "Cabaña" delante: la seccion entera va de cabañas, y con
                  la palabra el renglon se parte en dos lineas a 390 px. -->
             <span>${esc((cab ? cab.nombre : b.cabana_id).replace(/^Cabaña\s+/i, ""))}
-              &middot; ${yaLlego ? "sale " + fechaCorta(b.hasta) : "llega " + fechaCorta(b.desde)}</span>
+              &middot; ${yaLlego ? "sale " + fechaCorta(b.hasta) : "llega " + fechaCorta(b.desde)}
+              &middot; ${noches} noche${noches === 1 ? "" : "s"}</span>
           </div>
           ${yaLlego
             ? `<span class="estado ${b.token ? "hecho" : ""}">${b.token ? "app enviada" : "sin app"}</span>`
