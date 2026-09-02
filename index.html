@@ -14,12 +14,12 @@
      Al cambiar el número cambia la dirección, y una dirección nueva no está en
      ninguna caché. Se sube junto con `LZ_VER` de `luces.js`, que lo enseña en
      una esquina del mapa para poder comprobarlo de un vistazo. -->
-<link rel="stylesheet" href="tokens.css?v=34">
-<link rel="stylesheet" href="styles.css?v=34">
+<link rel="stylesheet" href="tokens.css?v=35">
+<link rel="stylesheet" href="styles.css?v=35">
 <!-- El pallet va en su propio archivo por tamaño, no por color: consume
      los mismos tokens que el resto, así que la paleta se sigue cambiando
      desde tokens.css y nada más. -->
-<link rel="stylesheet" href="pallet.css?v=34">
+<link rel="stylesheet" href="pallet.css?v=35">
 </head>
 <body>
 <!--
@@ -216,8 +216,10 @@ están en `panel-rediseno/panel.html`, y sus tokens en `panel-rediseno/base.css`
         </p>
         <div id="lista-cotizaciones"></div>
         <div id="aviso-cotizaciones"></div>
-        <button class="secundario ancho" type="button" id="btn-nueva-cotizacion">
-          Nueva cotización
+        <!-- Es LA acción de esta pantalla, así que va en primario. En gris
+             competía con las tarjetas y no se distinguía de un dato más. -->
+        <button class="ancho alto" type="button" id="btn-nueva-cotizacion">
+          + Nueva cotización
         </button>
       </div>
     </section>
@@ -445,13 +447,13 @@ están en `panel-rediseno/panel.html`, y sus tokens en `panel-rediseno/base.css`
   </nav>
 </div>
 
-<script src="config.js?v=34"></script>
-<script src="pallet.js?v=34"></script>
+<script src="config.js?v=35"></script>
+<script src="pallet.js?v=35"></script>
 <!-- El mapa del complejo, antes que `app.js` para que `LZ` ya exista cuando
      arranca el panel. Es el diseño de Claude Design portado a JavaScript a
      secas: sus estilos y posiciones van tal cual, solo cambia el motor. -->
-<script src="luces.js?v=34"></script>
-<script src="app.js?v=34"></script>
-<script src="menu.js?v=34"></script>
+<script src="luces.js?v=35"></script>
+<script src="app.js?v=35"></script>
+<script src="menu.js?v=35"></script>
 </body>
 </html>

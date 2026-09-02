@@ -1851,3 +1851,39 @@ button.hecho { background: var(--hoja-2); color: var(--tinta-3); font-weight: 50
 .aseo-linea { flex-wrap: wrap; }
 .aseo-linea .fila-txt { flex: 1 1 0; min-width: 0; }
 .aseo-linea .aseo-aviso { flex: 1 0 100%; margin: 0; }
+
+/* Los huecos del principio del mes NO deben imponer tamaño. Sin esto conservan
+   el `aspect-ratio: 1` de la celda normal, se hacen cuadrados de 58 px y, al
+   ser más anchos que su columna, la ensanchan: las otras seis se encogen y el
+   calendario entero sale estrecho y estirado. Un hueco no mide, solo ocupa. */
+.dia.vacio { aspect-ratio: auto; min-width: 0; }
+
+/* La fila de tarea: el título con su etiqueta arriba, la meta debajo.
+   `.ta-cuerpo` es un <button> y no declaraba `display`, así que heredaba el
+   `inline-flex` en fila del botón genérico: título, "Alta" y la meta salían en
+   el mismo renglón, se comían el ancho del círculo y se salían de la tarjeta. */
+.ta-cuerpo {
+  display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: flex-start; gap: 2px 8px;
+}
+/* La meta siempre en su propio renglón, y cortada si no cabe: el responsable
+   puede ser un correo largo y no puede empujar la fila fuera de la tarjeta. */
+.ta-cuerpo .ta-meta {
+  flex: 1 0 100%; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Los campos de hora y fecha de iOS traen su propia apariencia y un ancho
+   minimo propio: se salian de su caja y se montaban sobre el campo de al lado
+   —Check-out encima de "Niño hasta los"—. `width: 100%` no basta si el campo
+   se niega a encoger, asi que hace falta el `min-width: 0`. Y el valor va a la
+   izquierda, como en todos los demas campos, no centrado. */
+input, select, textarea { min-width: 0; }
+input[type="time"], input[type="date"] {
+  -webkit-appearance: none; appearance: none;
+  text-align: left; width: 100%; min-width: 0;
+}
+/* Safari alinea el contenido del campo por dentro; sin esto el valor queda
+   pegado al borde derecho aunque la caja ya mida bien. */
+input[type="time"]::-webkit-date-and-time-value,
+input[type="date"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
